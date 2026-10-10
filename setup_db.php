@@ -15,6 +15,13 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )";
     $conn->exec($sqlUsers);
+    // Provider ID mapping fields
+    foreach ([
+        "ALTER TABLE users ADD COLUMN cid CHAR(13) NULL UNIQUE",
+        "ALTER TABLE users ADD COLUMN cid_sha256 CHAR(64) NULL UNIQUE"
+    ] as $migration) {
+        try { $conn->exec($migration); } catch (PDOException $e) { /* มีคอลัมน์แล้ว */ }
+    }
     echo "Users table created successfully.<br>";
 
     // 2. Create Default Admin User (if not exists)

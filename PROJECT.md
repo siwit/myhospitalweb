@@ -53,6 +53,10 @@
 3. เปิดเว็บไซต์ผ่าน `http://localhost/myhospitalweb/`
 4. หากฐานข้อมูลยังไม่พร้อม ให้ตรวจสอบและรันไฟล์ setup/update ที่เกี่ยวข้อง
 
+## Provider ID
+
+ระบบเตรียมจุดตั้งค่าสำหรับ Provider ID ไว้ที่ `config/providerid.php` โดยอ่านค่าจาก Environment Variables ไม่ควรใส่ secret จริงลงในไฟล์โค้ดหรือ Git ให้ดูชื่อตัวแปรจาก `.env.example` และกำหนดค่าจริงใน Laragon/Apache ก่อนเปิดใช้งาน
+
 ## หมายเหตุสำหรับการพัฒนาครั้งต่อไป
 
 - ตรวจสอบ encoding ของไฟล์ PHP และเอกสารภาษาไทยให้เป็น UTF-8

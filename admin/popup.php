@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once '../includes/session.php';
 require_once '../config/db_connect.php';
 
 header('Content-Type: text/html; charset=utf-8');
