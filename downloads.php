@@ -10,12 +10,26 @@ $types = [
 ];
 
 $filter = isset($_GET['type']) ? $_GET['type'] : '';
+$departmentFilter = $_GET['department'] ?? '';
+$fiscalYearFilter = $_GET['fiscal_year'] ?? '';
+$departments = ['01:กลุ่มงานบริหารทั่วไป', '02:กลุ่มงานเทคนิคการแพทย์', '03:กลุ่มงานทันตกรรม', '04:กลุ่มงานผู้ป่วยใน', '05:กลุ่มงานห้องฉุกเฉิน',
+    '05:กลุ่มงานการแพทย์', '06:กลุ่มงานโภชนศาสตร์', '07:กลุ่มงานรังสีวิทยา', '08:กลุ่มงานเวชกรรมฟื้นฟู',
+    '09:กลุ่มงานประกันสุขภาพยุทธศาสตร์', '10:กลุ่มงานบริการด้านปฐมภูมิและองค์รวม', '11:กลุ่มงานการพยาบาล',
+    '12:กลุ่มงานการแพทย์แผนไทยและการแพทย์ทางเลือก', '13:กลุ่มงานจิตเวชและยาเสพติด', '14:กลุ่มงานสุขภาพดิจิทัล', '15:ศูนย์คุณภาพ HA', 'อื่นๆ'];
 $query = "SELECT * FROM documents WHERE is_published = 1";
 $params = [];
 
 if ($filter && isset($types[$filter])) {
     $query .= " AND type = ?";
     $params = [$filter];
+}
+if ($departmentFilter && in_array($departmentFilter, $departments, true)) {
+    $query .= " AND JSON_SEARCH(departments, 'one', ?) IS NOT NULL";
+    $params[] = $departmentFilter;
+}
+if ($fiscalYearFilter !== '' && preg_match('/^25[0-9]{2}$/', $fiscalYearFilter)) {
+    $query .= " AND fiscal_year = ?";
+    $params[] = $fiscalYearFilter;
 }
 $query .= " ORDER BY created_at DESC";
 
@@ -42,6 +56,14 @@ $documents = $stmt->fetchAll();
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <select name="department" onchange="this.form.submit()" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #ddd; min-width: 220px;">
+                    <option value="">ทุกหน่วยงาน</option>
+                    <?php foreach ($departments as $department): ?><option value="<?php echo htmlspecialchars($department); ?>" <?php echo $departmentFilter === $department ? 'selected' : ''; ?>><?php echo htmlspecialchars($department); ?></option><?php endforeach; ?>
+                </select>
+                <select name="fiscal_year" onchange="this.form.submit()" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #ddd; min-width: 130px;">
+                    <option value="">ทุกปีงบประมาณ</option>
+                    <?php for ($year = 2570; $year >= 2560; $year--): ?><option value="<?php echo $year; ?>" <?php echo $fiscalYearFilter == $year ? 'selected' : ''; ?>>ปีงบฯ <?php echo $year; ?></option><?php endfor; ?>
+                </select>
             </form>
         </div>
 
@@ -61,7 +83,8 @@ $documents = $stmt->fetchAll();
                                     <div style="font-weight: 500;"><?php echo htmlspecialchars($doc['title']); ?></div>
                                     <small style="color: #64748b;">
                                         <i class="far fa-folder"></i> <?php echo $types[$doc['type']]; ?> | 
-                                        <i class="far fa-calendar-alt"></i> <?php echo date("d/m/Y", strtotime($doc['created_at'])); ?>
+                                        <i class="far fa-calendar-alt"></i> <?php echo date("d/m/Y", strtotime($doc['uploaded_at'] ?: $doc['created_at'])); ?> |
+                                        ปีงบประมาณ <?php echo htmlspecialchars($doc['fiscal_year'] ?? '2569'); ?>
                                     </small>
                                 </td>
                                 <td style="padding: 15px 12px;">
