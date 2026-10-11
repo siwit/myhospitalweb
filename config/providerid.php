@@ -3,6 +3,10 @@
 // กำหนดค่าเหล่านี้ผ่าน Environment Variables ของ Laragon/Apache
 // ห้ามใส่ secret ลงใน Git
 
+// ไฟล์ตั้งค่า:
+// - Localhost: C:/laragon/www/myhospitalweb/.env.myhospital
+// - Production DirectAdmin: domains/<domain>/environment/myhospitalweb/.env.myhospital
+//   อย่าวาง secret ไว้ใน public_html และอย่า commit ไฟล์นี้ขึ้น Git
 // โหลดไฟล์ local/production secret โดยไม่เขียนทับ Environment Variable ที่ระบบกำหนดไว้แล้ว
 $envFiles = [dirname(__DIR__) . '/.env.myhospital', dirname(__DIR__) . '/.env'];
 // DirectAdmin: domains/<domain>/public_html/... และ domains/<domain>/environment/...
@@ -15,7 +19,7 @@ foreach (array_unique($envFiles) as $envFile) {
     if (!is_readable($envFile)) continue;
     foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
         $line = trim($line);
-        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) continue;
+        if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
         [$key, $value] = explode('=', $line, 2);
         $key = trim($key);
         $value = trim($value);
