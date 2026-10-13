@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Hospital Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', 'Sarabun', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+        .stat-card:hover { transform: translateY(-4px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="bg-[#f0f2f5] text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        const Dashboard = () => {
+            const [rawData] = useState([
+                { id: '10666', name: 'โรงพยาบาลมหาราชนครราชสีมา', rate: 720 },
+                { id: '10871', name: 'โรงพยาบาลครบุรี', rate: 720 },
+                { id: '10872', name: 'โรงพยาบาลเสิงสาง', rate: 720 },
+                { id: '10873', name: 'โรงพยาบาลคง', rate: 0 },
+                { id: '10874', name: 'โรงพยาบาลบ้านเหลื่อม', rate: 0 },
+                { id: '10875', name: 'โรงพยาบาลจักราช', rate: 720 },
+                { id: '10876', name: 'โรงพยาบาลโชคชัย', rate: 720 },
+                { id: '10877', name: 'โรงพยาบาลหลวงพ่อคูณ ปริสุทโธ', rate: 720 },
+                { id: '10878', name: 'โรงพยาบาลโนนไทย', rate: 720 },
+                { id: '10879', name: 'โรงพยาบาลโนนสูง', rate: 720 },
+                { id: '10880', name: 'โรงพยาบาลขามสะแกแสง', rate: 0 },
+                { id: '10881', name: 'โรงพยาบาลบัวใหญ่', rate: 720 },
+                { id: '10882', name: 'โรงพยาบาลประทาย', rate: 720 },
+                { id: '10883', name: 'โรงพยาบาลปักธงชัย', rate: 720 },
+                { id: '10884', name: 'โรงพยาบาลพิมาย', rate: 720 },
+                { id: '10885', name: 'โรงพยาบาลห้วยแถลง', rate: 720 },
+                { id: '10886', name: 'โรงพยาบาลชุมพวง', rate: 0 },
+                { id: '10887', name: 'โรงพยาบาลสูงเนิน', rate: 720 },
+                { id: '10888', name: 'โรงพยาบาลขามทะเลสอ', rate: 720 },
+                { id: '10889', name: 'โรงพยาบาลสีคิ้ว', rate: 720 },
+                { id: '10890', name: 'โรงพยาบาลปากช่องนานา', rate: 720 },
+                { id: '10891', name: 'โรงพยาบาลหนองบุญมาก', rate: 420 },
+                { id: '10892', name: 'โรงพยาบาลแก้งสนามนาง', rate: 720 },
+                { id: '10893', name: 'โรงพยาบาลโนนแดง', rate: 0 },
+                { id: '10894', name: 'โรงพยาบาลวังน้ำเขียว', rate: 0 },
+                { id: '11602', name: 'โรงพยาบาลเฉลิมพระเกียรติสมเด็จย่า 100 ปี', rate: 420 },
+                { id: '11608', name: 'โรงพยาบาลลำทะเมนชัย', rate: 0 },
+                { id: '22456', name: 'โรงพยาบาลพระทองคำ เฉลิมพระเกียรติ 80 พรรษา', rate: 420 },
+                { id: '23839', name: 'โรงพยาบาลเทพรัตน์นครราชสีมา', rate: 420 },
+                { id: '24692', name: 'โรงพยาบาลเฉลิมพระเกียรติ', rate: 720 },
+                { id: '27839', name: 'โรงพยาบาลบัวลาย', rate: 720 },
+                { id: '27840', name: 'โรงพยาบาลสีดา', rate: 720 },
+                { id: '27841', name: 'โรงพยาบาลเทพารักษ์', rate: 0 },
+                { id: '77498', name: 'โรงพยาบาลมกุฏคีรีวัน', rate: 0 },
+            ]);
+
+            const [filter, setFilter] = useState('ALL');
+
+            const stats = useMemo(() => {
+                const total = rawData.length;
+                const list720 = rawData.filter(d => d.rate === 720).length;
+                const list420 = rawData.filter(d => d.rate === 420).length;
+                const listNone = rawData.filter(d => d.rate === 0).length;
+                const active = list720 + list420;
+                return {
+                    total, list720, list420, listNone,
+                    p720: active ? ((list720 / active) * 100).toFixed(1) : 0,
+                    p420: active ? ((list420 / active) * 100).toFixed(1) : 0
+                };
+            }, [rawData]);
+
+            const filteredData = rawData.filter(d => {
+                if (filter === '720') return d.rate === 720;
+                if (filter === '420') return d.rate === 420;
+                if (filter === 'NONE') return d.rate === 0;
+                return true;
+            });
+
+            return (
+                <div className="min-h-screen pb-12">
+                    {/* Header Section */}
+                    <div className="bg-white border-b border-slate-200 mb-8 py-6 px-4 shadow-sm">
+                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">สำรวจค่าตอบแทนตามประกาศการจ่ายค่าตอบแทน ฉบับที่ 9/2566 สสจ.นม</h1>
+                                <p className="text-slate-500 text-sm">อัตราการจ่ายค่าตอบแทนเวรปฏิบัติงานนอกเวลาราชการในตำแหน่ง นักวิชาการคอมพิวเตอร์ ปี2569</p>
+                            </div>
+                            <div className="flex gap-2 text-xs font-medium text-slate-500">
+                                <span className="bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">อัปเดตล่าสุด: วันนี้</span>
+                                <span className="bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-100">สถานะ: ปกติ</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="max-w-6xl mx-auto px-4">
+                        {/* Stats Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                            {/* Card Total */}
+                            <div onClick={() => setFilter('ALL')} 
+                                 className={`stat-card cursor-pointer bg-white p-6 rounded-2xl shadow-sm border-2 transition-all duration-300 ${filter === 'ALL' ? 'border-blue-500 ring-4 ring-blue-50' : 'border-transparent hover:border-slate-200'}`}>
+                                {/*<div className="flex justify-between items-start mb-4">
+                                    <div className="p-2 bg-blue-50 rounded-lg"><span className="text-xl">🏢</span></div>
+                                    <span className="text-xs font-semibold px-2 py-1 bg-blue-100 text-blue-700 rounded uppercase">Total</span>
+                                </div> */}
+                                <div className="text-slate-500 text-xs font-medium uppercase tracking-wider">รพ. ทั้งหมด</div>
+                                <div className="text-3xl font-bold text-slate-800 mt-1">{stats.total} <span className="text-sm font-normal text-slate-400">แห่ง</span></div>
+                            </div>
+
+                            {/* Card 720 */}
+                            <div onClick={() => setFilter('720')} 
+                                 className={`stat-card cursor-pointer bg-white p-6 rounded-2xl shadow-sm border-2 transition-all duration-300 ${filter === '720' ? 'border-emerald-500 ring-4 ring-emerald-50' : 'border-transparent hover:border-slate-200'}`}>
+                                {/*<div className="flex justify-between items-start mb-4">
+                                     icon แสดงเฉพาะส่วน 720 บาท เพื่อเน้นความสำคัญของค่าตอบแทน 
+                                 <div className="p-2 bg-emerald-50 rounded-lg"><span className="text-xl">💰</span></div> 
+                                    <span className="text-xs font-semibold px-2 py-1 bg-emerald-100 text-emerald-700 rounded uppercase">High</span>
+                                </div>*/}
+                                <div className="text-slate-500 text-xs font-medium uppercase tracking-wider text-emerald-600">อัตรา 720 บาท</div>
+                                <div className="text-3xl font-bold text-emerald-600 mt-1">{stats.list720}</div>
+                                <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 rounded-full" style={{width: `${stats.p720}%`}}></div>
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-1 font-bold italic text-right">คิดเป็น {stats.p720}%</div>
+                            </div>
+
+                            {/* Card 420 */}
+                            <div onClick={() => setFilter('420')} 
+                                 className={`stat-card cursor-pointer bg-white p-6 rounded-2xl shadow-sm border-2 transition-all duration-300 ${filter === '420' ? 'border-orange-500 ring-4 ring-orange-50' : 'border-transparent hover:border-slate-200'}`}>
+                               {/* <div className="flex justify-between items-start mb-4">
+                                    <div className="p-2 bg-orange-50 rounded-lg"><span className="text-xl">🪙</span></div>
+                                    <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded uppercase">Standard</span>
+                                </div>*/}
+                                <div className="text-slate-500 text-xs font-medium uppercase tracking-wider text-orange-600">อัตรา 420 บาท</div>
+                                <div className="text-3xl font-bold text-orange-600 mt-1">{stats.list420}</div>
+                                <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-orange-500 rounded-full" style={{width: `${stats.p420}%`}}></div>
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-1 font-bold italic text-right">คิดเป็น {stats.p420}%</div>
+                            </div>
+
+                            {/* Card None */}
+                            <div onClick={() => setFilter('NONE')} 
+                                 className={`stat-card cursor-pointer bg-white p-6 rounded-2xl shadow-sm border-2 transition-all duration-300 ${filter === 'NONE' ? 'border-rose-500 ring-4 ring-rose-50' : 'border-transparent hover:border-slate-200'}`}>
+                               {/* <div className="flex justify-between items-start mb-4">
+                                    <div className="p-2 bg-rose-50 rounded-lg"><span className="text-xl">⏳</span></div>
+                                    <span className="text-xs font-semibold px-2 py-1 bg-rose-100 text-rose-700 rounded uppercase">None</span>
+                                </div>*/}
+                                <div className="text-slate-500 text-xs font-medium uppercase tracking-wider text-rose-600">ไม่มีเวรปฏิบัติงาน</div>
+                                <div className="text-3xl font-bold text-rose-600 mt-1">{stats.listNone}</div>
+                                <div className="text-[10px] text-slate-400 mt-4 font-medium uppercase italic">สถานะ: ยังไม่มีข้อมูล</div>
+                            </div>
+                        </div>
+
+                        {/* Table Section */}
+                        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden overflow-x-auto">
+                            <div className="px-8 py-5 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
+                                <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                    รายละเอียดหน่วยบริการ: <span className="text-blue-600 px-2 py-0.5 bg-blue-50 rounded-md ml-1">{filter}</span>
+                                </h3>
+                                <div className="text-xs text-slate-400 font-medium tracking-widest uppercase">
+                                    {filteredData.length} หน่วยบริการ
+                                </div>
+                            </div>
+                            <table className="w-full text-left">
+                                <thead className="bg-[#fafbfc]">
+                                    <tr>
+                                        <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">รหัสหน่วยบริการ</th>
+                                        <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">ชื่อโรงพยาบาล</th>
+                                        <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">อัตราจ่าย (THB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {filteredData.map(item => (
+                                        <tr key={item.id} className="group hover:bg-slate-50 transition-colors duration-200">
+                                            <td className="px-8 py-4 text-sm font-mono text-slate-400 group-hover:text-blue-600 transition-colors">{item.id}</td>
+                                            <td className="px-8 py-4 text-sm font-semibold text-slate-700">{item.name}</td>
+                                            <td className="px-8 py-4 text-right">
+                                                <span className={`inline-block px-4 py-1.5 rounded-xl text-[11px] font-bold shadow-sm border ${
+                                                    item.rate === 720 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 
+                                                    item.rate === 420 ? 'bg-orange-50 text-orange-700 border-orange-100' : 
+                                                    'bg-slate-100 text-slate-400 border-transparent'
+                                                }`}>
+                                                    {item.rate > 0 ? `${item.rate.toLocaleString()}` : 'ไม่มีเวร'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Dashboard />);
+    </script>
+</body>
+<footer>
+    <a href="https://hr.moph.go.th/site/hr_moph/?p=3020" 
+   target="_blank" 
+   class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition shadow-md flex items-center gap-2">
+   <span>📄 มาตรฐานกำหนดตำแหน่ง </span>
+</a>
+
+<a href="https://www.uckkpho.com/other/2087/" 
+   target="_blank" 
+   class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition shadow-md flex items-center gap-2">
+   <span>📄 กลุ่มวิชาชีพที่ได้รับเงินประจำตำแหน่ง </span>
+</a>
+</footer>
+</html>

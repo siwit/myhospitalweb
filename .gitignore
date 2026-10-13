@@ -1,13 +1,12 @@
-# Environment files and secrets
-.env
-.env.*
-!.env.example
-.env.myhospital
-
-# Local Git repair backup
-.git-old-corrupt-*/
-
-# Runtime and temporary files
-*.log
-tmp/
-temp/
+/.idea
+/vendor
+/node_modules
+/assets/css/*.map
+/assets/js/*.map
+/assets/images/popup/*
+/tmp
+/*.log
+/.env
+/.env.local
+/.env.*.local
+.DS_Store
