@@ -8,6 +8,10 @@ $dateFrom = isset($_GET['date_from']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_G
 $dateTo = isset($_GET['date_to']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date_to'])
     ? $_GET['date_to']
     : '2026-10-26';
+$mainDepcode = isset($_GET['main_dep']) ? trim((string)$_GET['main_dep']) : '';
+if ($mainDepcode !== '' && $mainDepcode !== '__none__' && !preg_match('/^[A-Za-z0-9_-]{1,10}$/', $mainDepcode)) {
+    $mainDepcode = '';
+}
 
 if ($dateFrom > $dateTo) {
     [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
@@ -15,6 +19,7 @@ if ($dateFrom > $dateTo) {
 
 $error = '';
 $dash = null;
+$departments = [];
 $dataSource = strtolower((string)(getenv('WAITTIME_SOURCE') ?: 'local'));
 
 try {
@@ -23,10 +28,13 @@ try {
         require __DIR__ . '/config/his_db.php';
         $dash = WaitTimeLayer2::buildDashboard($his, $dateFrom, $dateTo);
         $dash['data_source'] = 'his';
+        $departments = [];
     } else {
         require __DIR__ . '/config/db_connect.php';
-        $dash = WaitTimeStore::buildDashboard($conn, $dateFrom, $dateTo);
+        $departments = WaitTimeStore::listDepartments($conn, $dateFrom, $dateTo);
+        $dash = WaitTimeStore::buildDashboard($conn, $dateFrom, $dateTo, $mainDepcode !== '' ? $mainDepcode : null);
         $dash['data_source'] = 'local';
+        $departments = $dash['departments'] ?? $departments;
     }
 } catch (Throwable $e) {
     $error = $e->getMessage();
@@ -76,7 +84,8 @@ include __DIR__ . '/includes/header.php';
     font-size: 0.9rem;
 }
 .wt-filter .flatpickr-input,
-.wt-filter input.wt-date-th {
+.wt-filter input.wt-date-th,
+.wt-filter select.wt-dept-select {
     padding: 8px 10px;
     border: 1px solid #d1d5db;
     border-radius: 6px;
@@ -84,6 +93,10 @@ include __DIR__ . '/includes/header.php';
     background: #fff;
     font-family: inherit;
     font-size: 0.95rem;
+}
+.wt-filter select.wt-dept-select {
+    min-width: 240px;
+    max-width: 320px;
 }
 .wt-filter .flatpickr-input[readonly] {
     cursor: pointer;
@@ -206,12 +219,12 @@ include __DIR__ . '/includes/header.php';
 <div class="card">
     <h2 class="wt-page-title">
         <i class="fas fa-hourglass-half"></i> ข้อมูลระยะเวลาการให้บริการ
-        <?php if ($dash && !empty($dash['hospitalcode'])): ?>
-            <span class="wt-badge">รหัส รพ. <?php echo htmlspecialchars((string)$dash['hospitalcode']); ?></span>
-        <?php endif; ?>
-        <?php if ($dash && !empty($dash['data_source'])): ?>
-            <span class="wt-badge"><?php echo $dash['data_source'] === 'his' ? 'แหล่ง: HIS ตรง' : 'แหล่ง: ฐานเว็บ'; ?></span>
-        <?php endif; ?>
+        <!-- ?php if ($dash && !empty($dash['hospitalcode'])): ?>
+            <span class="wt-badge">รหัส รพ ?php echo htmlspecialchars((string)$dash['hospitalcode']); ?></span>
+        ?php endif; ? -->
+        <!-- ?php if ($dash && !empty($dash['data_source'])): ?>
+            <span class="wt-badge"><php echo $dash['data_source'] === 'his' ? 'แหล่ง: HIS ตรง' : 'แหล่ง: ฐานเว็บ'; ?></span>
+        ?php endif; ?> -->
     </h2>
     <?php if ($dash && !empty($dash['synced_at'])): ?>
         <p style="margin:-0.4rem 0 1rem; color:#64748b; font-size:0.9rem;">
@@ -230,6 +243,27 @@ include __DIR__ . '/includes/header.php';
             <span>ถึงวันที่</span>
             <input type="text" id="date_to_th" class="wt-date-th" placeholder="วัน เดือน ปี พ.ศ." readonly required>
             <input type="hidden" name="date_to" id="date_to" value="<?php echo htmlspecialchars($dateTo); ?>">
+        </div>
+        <div class="wt-date-wrap">
+            <span>แผนกหลัก</span>
+            <select name="main_dep" class="wt-dept-select">
+                <option value="">ทุกแผนก</option>
+                <?php foreach ($departments as $dep): ?>
+                    <?php
+                        $code = (string)($dep['main_depcode'] ?? '');
+                        $name = trim((string)($dep['main_department'] ?? ''));
+                        $optionValue = ($code === '') ? '__none__' : $code;
+                        if ($code === '' && $name === '') {
+                            $label = '(ไม่ระบุแผนก) (' . number_format((int)($dep['visit_count'] ?? 0)) . ')';
+                        } else {
+                            $label = ($name !== '' ? $name : $code) . ' (' . number_format((int)($dep['visit_count'] ?? 0)) . ')';
+                        }
+                    ?>
+                    <option value="<?php echo htmlspecialchars($optionValue); ?>" <?php echo ($mainDepcode !== '' && $mainDepcode === $optionValue) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($label); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
         <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> แสดงผล</button>
     </form>

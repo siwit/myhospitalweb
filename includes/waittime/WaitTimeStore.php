@@ -1,7 +1,7 @@
 <?php
 /**
  * อ่านสถิติระยะเวลารอคอยจากตารางท้องถิ่น (visit นิรนาม)
- * แล้วสรุปเป็น Dashboard ตามช่วงวันที่
+ * แล้วสรุปเป็น Dashboard ตามช่วงวันที่ / แผนกหลัก
  */
 class WaitTimeStore
 {
@@ -35,14 +35,55 @@ class WaitTimeStore
                 // ignore if already exists / partial
             }
         }
+        self::ensureColumns($conn);
+    }
+
+    /** เพิ่มคอลัมน์ใหม่ให้ตารางเดิม (production ที่สร้างไว้แล้ว) */
+    public static function ensureColumns(PDO $conn): void
+    {
+        $alters = [
+            "ALTER TABLE waittime_visit_anon ADD COLUMN main_depcode VARCHAR(10) DEFAULT NULL AFTER is_er_visit",
+            "ALTER TABLE waittime_visit_anon ADD COLUMN main_department VARCHAR(150) DEFAULT NULL AFTER main_depcode",
+            "ALTER TABLE waittime_visit_anon ADD KEY idx_waittime_main_dep (main_depcode)",
+        ];
+        foreach ($alters as $sql) {
+            try {
+                $conn->exec($sql);
+            } catch (PDOException $e) {
+                // duplicate column/key
+            }
+        }
+    }
+
+    /**
+     * รายการแผนกหลักในช่วงวันที่ (สำหรับ dropdown)
+     * @return array<int, array{main_depcode:string, main_department:?string, visit_count:int}>
+     */
+    public static function listDepartments(PDO $conn, string $dateFrom, string $dateTo): array
+    {
+        self::ensureTables($conn);
+        $stmt = $conn->prepare("
+            SELECT
+              COALESCE(main_depcode, '') AS main_depcode,
+              MAX(main_department) AS main_department,
+              COUNT(*) AS visit_count
+            FROM waittime_visit_anon
+            WHERE vstdate BETWEEN :date_from AND :date_to
+            GROUP BY COALESCE(main_depcode, '')
+            ORDER BY visit_count DESC, main_department ASC
+        ");
+        $stmt->execute(['date_from' => $dateFrom, 'date_to' => $dateTo]);
+        return $stmt->fetchAll() ?: [];
     }
 
     /**
      * @return array<string, mixed>
      */
-    public static function buildDashboard(PDO $conn, string $dateFrom, string $dateTo): array
+    public static function buildDashboard(PDO $conn, string $dateFrom, string $dateTo, ?string $mainDepcode = null): array
     {
         self::ensureTables($conn);
+
+        [$whereSql, $params] = self::buildWhere($dateFrom, $dateTo, $mainDepcode);
 
         $sqlKpi = "
             SELECT
@@ -64,23 +105,23 @@ class WaitTimeStore
               MAX(hospitalcode) AS hospitalcode,
               MAX(synced_at) AS synced_at
             FROM waittime_visit_anon
-            WHERE vstdate BETWEEN :date_from AND :date_to
+            WHERE {$whereSql}
         ";
         $stmt = $conn->prepare($sqlKpi);
-        $stmt->execute(['date_from' => $dateFrom, 'date_to' => $dateTo]);
+        $stmt->execute($params);
         $kpi = $stmt->fetch() ?: [];
 
         $sqlBusy = "
             SELECT vst_hour, COUNT(*) AS vn_count
             FROM waittime_visit_anon
-            WHERE vstdate BETWEEN :date_from AND :date_to
+            WHERE {$whereSql}
               AND vst_hour BETWEEN 6 AND 15
             GROUP BY vst_hour
             ORDER BY vn_count DESC, vst_hour ASC
             LIMIT 1
         ";
         $stmt = $conn->prepare($sqlBusy);
-        $stmt->execute(['date_from' => $dateFrom, 'date_to' => $dateTo]);
+        $stmt->execute($params);
         $busy = $stmt->fetch() ?: null;
 
         $sqlLongest = "
@@ -89,7 +130,7 @@ class WaitTimeStore
               COUNT(*) AS vn_count,
               ROUND(AVG(CASE WHEN total_opd_minutes BETWEEN 0 AND 720 THEN total_opd_minutes END), 1) AS avg_minutes
             FROM waittime_visit_anon
-            WHERE vstdate BETWEEN :date_from AND :date_to
+            WHERE {$whereSql}
               AND vst_hour BETWEEN 6 AND 15
             GROUP BY vst_hour
             HAVING avg_minutes IS NOT NULL
@@ -97,7 +138,7 @@ class WaitTimeStore
             LIMIT 1
         ";
         $stmt = $conn->prepare($sqlLongest);
-        $stmt->execute(['date_from' => $dateFrom, 'date_to' => $dateTo]);
+        $stmt->execute($params);
         $longest = $stmt->fetch() ?: null;
 
         $sqlHours = "
@@ -106,13 +147,13 @@ class WaitTimeStore
               COUNT(*) AS vn_count,
               ROUND(AVG(CASE WHEN total_opd_minutes BETWEEN 0 AND 720 THEN total_opd_minutes END), 1) AS avg_minutes
             FROM waittime_visit_anon
-            WHERE vstdate BETWEEN :date_from AND :date_to
+            WHERE {$whereSql}
               AND vst_hour BETWEEN 6 AND 15
             GROUP BY vst_hour
             ORDER BY vst_hour
         ";
         $stmt = $conn->prepare($sqlHours);
-        $stmt->execute(['date_from' => $dateFrom, 'date_to' => $dateTo]);
+        $stmt->execute($params);
         $hourRows = $stmt->fetchAll();
 
         $hourStats = [];
@@ -136,9 +177,27 @@ class WaitTimeStore
         $busyHour = $busy ? (int)$busy['vst_hour'] : null;
         $longestHour = $longest ? (int)$longest['vst_hour'] : null;
 
+        $selectedDeptName = null;
+        if ($mainDepcode !== null && $mainDepcode !== '') {
+            $stmt = $conn->prepare("
+                SELECT MAX(main_department) AS main_department
+                FROM waittime_visit_anon
+                WHERE vstdate BETWEEN :date_from AND :date_to
+                  AND main_depcode = :main_depcode
+            ");
+            $stmt->execute([
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'main_depcode' => $mainDepcode,
+            ]);
+            $selectedDeptName = $stmt->fetchColumn() ?: null;
+        }
+
         return [
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
+            'main_depcode' => $mainDepcode,
+            'main_department' => $selectedDeptName,
             'hospitalcode' => $kpi['hospitalcode'] ?? null,
             'synced_at' => $kpi['synced_at'] ?? null,
             'total_vn' => (int)($kpi['total_vn'] ?? 0),
@@ -165,7 +224,31 @@ class WaitTimeStore
                 'vn_count' => (int)($busy['vn_count'] ?? 0),
             ] : null,
             'hour_stats' => array_values($hourStats),
+            'departments' => self::listDepartments($conn, $dateFrom, $dateTo),
         ];
+    }
+
+    /**
+     * @return array{0:string,1:array<string,mixed>}
+     */
+    private static function buildWhere(string $dateFrom, string $dateTo, ?string $mainDepcode): array
+    {
+        $where = ['vstdate BETWEEN :date_from AND :date_to'];
+        $params = [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+        ];
+
+        if ($mainDepcode !== null && $mainDepcode !== '') {
+            if ($mainDepcode === '__none__') {
+                $where[] = '(main_depcode IS NULL OR main_depcode = \'\')';
+            } else {
+                $where[] = 'main_depcode = :main_depcode';
+                $params['main_depcode'] = $mainDepcode;
+            }
+        }
+
+        return [implode(' AND ', $where), $params];
     }
 
     private static function numOrNull($value): ?float

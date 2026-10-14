@@ -52,11 +52,13 @@ if (count($rows) > 2000) {
 }
 
 WaitTimeStore::ensureTables($conn);
+WaitTimeStore::ensureColumns($conn);
 
 $upsert = $conn->prepare("
     INSERT INTO waittime_visit_anon (
       source_hash, hospitalcode, vstdate, vsttime, vst_hour,
       is_appointment_visit, is_er_visit,
+      main_depcode, main_department,
       screening_depcode, screening_department,
       doctor_depcode, doctor_department,
       pharmacy_depcode, pharmacy_department,
@@ -68,6 +70,7 @@ $upsert = $conn->prepare("
     ) VALUES (
       :source_hash, :hospitalcode, :vstdate, :vsttime, :vst_hour,
       :is_appointment_visit, :is_er_visit,
+      :main_depcode, :main_department,
       :screening_depcode, :screening_department,
       :doctor_depcode, :doctor_department,
       :pharmacy_depcode, :pharmacy_department,
@@ -84,6 +87,8 @@ $upsert = $conn->prepare("
       vst_hour = VALUES(vst_hour),
       is_appointment_visit = VALUES(is_appointment_visit),
       is_er_visit = VALUES(is_er_visit),
+      main_depcode = VALUES(main_depcode),
+      main_department = VALUES(main_department),
       screening_depcode = VALUES(screening_depcode),
       screening_department = VALUES(screening_department),
       doctor_depcode = VALUES(doctor_depcode),
@@ -150,6 +155,8 @@ try {
             'vst_hour' => $intOrNull($row['vst_hour'] ?? null),
             'is_appointment_visit' => !empty($row['is_appointment_visit']) ? 1 : 0,
             'is_er_visit' => !empty($row['is_er_visit']) ? 1 : 0,
+            'main_depcode' => $strOrNull($row['main_depcode'] ?? null),
+            'main_department' => $strOrNull($row['main_department'] ?? null),
             'screening_depcode' => $strOrNull($row['screening_depcode'] ?? null),
             'screening_department' => $strOrNull($row['screening_department'] ?? null),
             'doctor_depcode' => $strOrNull($row['doctor_depcode'] ?? null),

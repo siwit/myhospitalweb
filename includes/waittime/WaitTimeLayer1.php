@@ -72,6 +72,8 @@ SELECT
   {$arriveRx} AS dt_arrive_pharmacy,
   {$receiveDrug} AS dt_receive_drug,
 
+  o.main_dep AS main_depcode,
+  kd.department AS main_department,
   st.service3_dep AS screening_depcode,
   d3.department AS screening_department,
   st.service5_dep AS doctor_depcode,
@@ -125,6 +127,8 @@ SELECT
   TIMESTAMPDIFF(MINUTE, xr.xray_order_time, xr.xray_report_time) AS xray_total_minutes
 
 FROM service_time st
+LEFT JOIN ovst o ON o.vn = st.vn
+LEFT JOIN kskdepartment kd ON kd.depcode = o.main_dep
 LEFT JOIN kskdepartment d3 ON d3.depcode = st.service3_dep
 LEFT JOIN kskdepartment d5 ON d5.depcode = st.service5_dep
 LEFT JOIN kskdepartment d6 ON d6.depcode = st.service6_dep

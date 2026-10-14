@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS waittime_visit_anon (
   vst_hour TINYINT UNSIGNED DEFAULT NULL,
   is_appointment_visit TINYINT(1) NOT NULL DEFAULT 0,
   is_er_visit TINYINT(1) NOT NULL DEFAULT 0,
+  main_depcode VARCHAR(10) DEFAULT NULL,
+  main_department VARCHAR(150) DEFAULT NULL,
   screening_depcode VARCHAR(10) DEFAULT NULL,
   screening_department VARCHAR(150) DEFAULT NULL,
   doctor_depcode VARCHAR(10) DEFAULT NULL,
@@ -34,7 +36,8 @@ CREATE TABLE IF NOT EXISTS waittime_visit_anon (
   PRIMARY KEY (id),
   UNIQUE KEY uq_waittime_source_hash (source_hash),
   KEY idx_waittime_vstdate (vstdate),
-  KEY idx_waittime_vst_hour (vst_hour)
+  KEY idx_waittime_vst_hour (vst_hour),
+  KEY idx_waittime_main_dep (main_depcode)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS waittime_sync_log (
