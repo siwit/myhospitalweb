@@ -48,6 +48,28 @@ function wt_fmt(?float $n): string
     return number_format($n, 1);
 }
 
+/** แสดงวันเวลาเป็น วัน เดือน ปี พ.ศ. เวลา เช่น 14 ตุลาคม 2569 16:30 น. */
+function wt_fmt_datetime_be(?string $datetime): string
+{
+    if ($datetime === null || trim($datetime) === '') {
+        return '-';
+    }
+    $ts = strtotime($datetime);
+    if ($ts === false) {
+        return $datetime;
+    }
+    $months = [
+        1 => 'มกราคม', 2 => 'กุมภาพันธ์', 3 => 'มีนาคม', 4 => 'เมษายน',
+        5 => 'พฤษภาคม', 6 => 'มิถุนายน', 7 => 'กรกฎาคม', 8 => 'สิงหาคม',
+        9 => 'กันยายน', 10 => 'ตุลาคม', 11 => 'พฤศจิกายน', 12 => 'ธันวาคม',
+    ];
+    $d = (int)date('j', $ts);
+    $m = $months[(int)date('n', $ts)] ?? date('m', $ts);
+    $yBe = (int)date('Y', $ts) + 543;
+    $hm = date('H:i', $ts);
+    return sprintf('%d %s %d %s น.', $d, $m, $yBe, $hm);
+}
+
 include __DIR__ . '/includes/header.php';
 ?>
 
@@ -228,7 +250,7 @@ include __DIR__ . '/includes/header.php';
     </h2>
     <?php if ($dash && !empty($dash['synced_at'])): ?>
         <p style="margin:-0.4rem 0 1rem; color:#64748b; font-size:0.9rem;">
-            ข้อมูล sync ล่าสุดในช่วงนี้: <?php echo htmlspecialchars((string)$dash['synced_at']); ?>
+            ข้อมูล sync ล่าสุดในช่วงนี้: <?php echo htmlspecialchars(wt_fmt_datetime_be((string)$dash['synced_at'])); ?>
         </p>
     <?php endif; ?>
 
@@ -617,8 +639,7 @@ include __DIR__ . '/includes/header.php';
         </div>
 
         <p class="wt-note">
-            <strong>แหล่งข้อมูล:</strong> Node API (`waittime_api`) ดึงจาก HIS แล้วตัด HN/VN ออก ส่ง visit นิรนามมาเก็บบนฐานเว็บ
-            หน้านี้สรุปตามช่วงวันที่ที่เลือกจากข้อมูลท้องถิ่น<br>
+            
             <strong>หมายเหตุ:</strong> กรองค่าผิดปกติเบื้องต้นออก (เช่น นาทีติดลบ/เกินเกณฑ์) ก่อนหาค่าเฉลี่ย · ไม่นับเคส ER
         </p>
     <?php endif; ?>
