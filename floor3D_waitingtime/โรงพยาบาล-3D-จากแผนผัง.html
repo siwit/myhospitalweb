@@ -1,0 +1,703 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>โรงพยาบาล 3D จากแผนผัง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --bg:#E6EEEC; --panel:rgba(255,255,255,.94); --ink:#13302C; --muted:#5E7773; --line:#D6E4E1;
+  --teal:#0E8C7F; --teal-soft:#DDF1EE; --free:#1E9A5F; --free-soft:#DDF3E8; --mid:#B97C06; --mid-soft:#FBEFD2; --full:#D2443C; --full-soft:#FBE1DF;
+  --shadow:0 8px 28px rgba(20,70,62,.13);
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1E1C; --panel:rgba(22,40,37,.94); --ink:#E3F1EE; --muted:#93AEA9; --line:#2A4440;
+  --teal:#38C2B2; --teal-soft:#16403B; --free:#45CC8B; --free-soft:#173D2C; --mid:#F0B547; --mid-soft:#45361A; --full:#F27B73; --full-soft:#4A2321; --shadow:0 8px 28px rgba(0,0,0,.35);}}
+:root[data-theme="dark"]{
+  --bg:#0F1E1C; --panel:rgba(22,40,37,.94); --ink:#E3F1EE; --muted:#93AEA9; --line:#2A4440;
+  --teal:#38C2B2; --teal-soft:#16403B; --free:#45CC8B; --free-soft:#173D2C; --mid:#F0B547; --mid-soft:#45361A; --full:#F27B73; --full-soft:#4A2321; --shadow:0 8px 28px rgba(0,0,0,.35);}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;position:relative;overflow:hidden;background:var(--bg);color:var(--ink);font-family:"Anuphan","IBM Plex Sans Thai",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+#stage{position:absolute;inset:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.ui{position:absolute;inset:0;pointer-events:none}
+.panel{pointer-events:auto;background:var(--panel);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.top{position:absolute;top:12px;left:12px;right:12px;display:flex;flex-wrap:wrap;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;height:46px;padding:0 14px 0 8px;min-width:0}
+.cross{flex:none;width:32px;height:32px;border-radius:9px;background:var(--teal);display:grid;place-items:center}
+.bname{font-weight:700;font-size:14.5px;line-height:1.15;white-space:nowrap}
+.bsub{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.search{flex:1 1 200px;display:flex;align-items:center;gap:8px;height:46px;padding:0 12px;min-width:0}
+.search svg{flex:none;color:var(--muted)}
+.search input{border:0;background:transparent;font:inherit;font-size:14px;color:var(--ink);flex:1;min-width:0;outline:none}
+.search input::placeholder{color:var(--muted)}
+.live{height:46px;display:flex;align-items:center;gap:7px;padding:0 13px;font-size:13.5px;font-weight:700;color:var(--free);font-variant-numeric:tabular-nums}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--free);box-shadow:0 0 0 3px var(--free-soft)}
+.kpis{flex:1 1 100%;display:flex;gap:8px;pointer-events:none}
+.kpi{padding:8px 13px 9px;display:flex;flex-direction:column;gap:1px;min-width:130px}
+.kl{font-size:12px;color:var(--muted);font-weight:500;white-space:nowrap}
+.kv{display:flex;align-items:baseline;gap:6px}
+.kv b{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums}
+.kv small{font-size:12px;color:var(--muted);font-weight:600}
+.lvl{font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px}
+.lv0{background:var(--free-soft);color:var(--free)}.lv1{background:var(--mid-soft);color:var(--mid)}.lv2{background:var(--full-soft);color:var(--full)}
+.ctrls{position:absolute;right:12px;top:47%;transform:translateY(-50%);display:flex;flex-direction:column;padding:4px;gap:2px}
+.ctrls button{width:38px;height:38px;border:0;background:transparent;border-radius:10px;cursor:pointer;display:grid;place-items:center}
+.ctrls button:hover{background:var(--teal-soft)}
+.ctrls hr{border:0;height:1px;background:var(--line);margin:3px 6px}
+.bottom{position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:10px;align-items:flex-end}
+.card{flex:1 1 auto;max-width:560px;padding:14px 16px}
+.empty{font-size:13.5px;color:var(--muted);line-height:1.6}
+.empty b{color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12px;color:var(--ink)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%}
+.chead{display:flex;align-items:center;gap:12px}
+.qno{flex:none;min-width:58px;height:46px;padding:0 8px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:18px;color:#fff;font-variant-numeric:tabular-nums}
+.ct{flex:1;min-width:0}
+.ctitle{font-weight:700;font-size:15px}
+.csub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{flex:none;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--teal-soft);color:var(--teal);max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge.ok{background:var(--free-soft);color:var(--free)}.badge.warn{background:var(--mid-soft);color:var(--mid)}.badge.bad{background:var(--full-soft);color:var(--full)}
+.steps{list-style:none;margin:14px 0 2px;padding:0;display:grid}
+.steps li{position:relative;text-align:center;font-size:11.5px;color:var(--muted);line-height:1.3}
+.steps li::before{content:"";position:absolute;top:9px;left:-50%;width:100%;height:2px;background:var(--line)}
+.steps li:first-child::before{display:none}
+.steps li.done::before,.steps li.cur::before{background:var(--teal)}
+.steps .dot{position:relative;display:block;width:20px;height:20px;margin:0 auto 5px;border-radius:50%;background:var(--panel);border:2px solid var(--line)}
+.steps li.done .dot{background:var(--teal);border-color:var(--teal)}
+.steps li.cur .dot{border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-soft)}
+.steps li.cur{color:var(--ink);font-weight:700}
+.cmeta{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.55}
+.cmeta b{color:var(--ink);font-weight:600}
+.cact{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.cact:empty{display:none}
+.cact button{border:1px solid var(--teal);background:var(--teal);color:#fff;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:10px;cursor:pointer}
+.cact button.ghost{background:transparent;color:var(--teal)}
+.cact button:disabled{opacity:.4;cursor:default}
+.zones{width:340px;padding:12px;margin-left:auto}
+.zhead{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px;flex-wrap:wrap}
+.zhead b{font-weight:700;margin-right:auto}
+.sw-l{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;user-select:none}
+.sw-l input{position:absolute;opacity:0;width:1px;height:1px}
+.sw{width:30px;height:18px;border-radius:99px;background:var(--line);position:relative;transition:background .2s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.sw-l input:checked+.sw{background:var(--teal)}
+.sw-l input.rush:checked+.sw{background:var(--full)}
+.sw-l input:checked+.sw::after{transform:translateX(12px)}
+.sw-l input:focus-visible+.sw{outline:2px solid var(--teal);outline-offset:2px}
+.zlist{display:flex;flex-direction:column;gap:3px;max-height:250px;overflow:auto}
+.zrow{display:grid;grid-template-columns:1fr auto;gap:3px 8px;width:100%;padding:6px 8px;border:1px solid transparent;background:transparent;border-radius:10px;cursor:pointer;text-align:left}
+.zrow:hover{background:var(--teal-soft)}
+.zrow.sel{border-color:var(--teal);background:var(--teal-soft)}
+.zn{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zc{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.bar{grid-column:1/-1;height:5px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;transition:width .4s}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.zl{position:absolute;left:0;top:0;display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:8px;background:var(--panel);border:1px solid var(--line);font-size:11.5px;font-weight:600;white-space:nowrap;box-shadow:0 3px 10px rgba(20,70,62,.12)}
+.zl em{font-style:normal;font-weight:700;font-size:11px;padding:1px 6px;border-radius:99px;font-variant-numeric:tabular-nums}
+.zl.room{background:transparent;border:0;box-shadow:none;color:var(--ink);font-weight:600;text-shadow:0 1px 0 rgba(255,255,255,.7)}
+.tag{position:absolute;left:0;top:0;background:var(--teal);color:#fff;font-size:11.5px;font-weight:700;padding:4px 8px;border-radius:8px;white-space:nowrap;pointer-events:none;display:none;box-shadow:0 4px 12px rgba(14,140,127,.35)}
+.toast{position:absolute;left:50%;top:128px;transform:translate(-50%,-6px);opacity:0;transition:opacity .25s,transform .25s;background:var(--ink);color:var(--bg);font-size:13px;font-weight:600;padding:9px 14px;border-radius:12px;pointer-events:none;max-width:calc(100% - 24px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (max-width:720px){
+  .brand{flex:1 1 100%;order:-1}
+  .search{flex:1 1 0;height:40px}
+  .live{height:40px}
+  .kpi{flex:1 1 0;min-width:0;padding:7px 10px 8px}
+  .hide-m{display:none!important}
+  .kv b{font-size:17px}
+  .toast{top:176px}
+  .ctrls button{width:34px;height:34px}
+  .bottom{flex-direction:column;align-items:stretch;gap:8px}
+  .zones{width:auto;margin:0;padding:10px}
+  .zlist{flex-direction:row;overflow-x:auto;max-height:none;scrollbar-width:none}
+  .zlist::-webkit-scrollbar{display:none}
+  .zrow{flex:none;width:150px}
+  .card{max-width:none;padding:12px 14px}
+  .zl{font-size:10px;padding:2px 6px}
+}
+@media (prefers-reduced-motion: reduce){.toast,.sw,.sw::after,.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="ui">
+  <div class="labels" id="labels"></div>
+  <div class="top">
+    <div class="brand panel">
+      <span class="cross"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg></span>
+      <span><span class="bname">โรงพยาบาล 3D จากแผนผัง</span><br><span class="bsub">จำลองคิวผู้ป่วย ความหนาแน่น และคอมพิวเตอร์</span></span>
+    </div>
+    <label class="search panel">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="ค้นหาเลขคิว ห้อง หรือ PC เช่น OPD, PC-12" autocomplete="off" aria-label="ค้นหา">
+    </label>
+    <div class="live panel"><i></i><span id="clock">08:00</span></div>
+    <div class="kpis">
+      <div class="kpi panel"><span class="kl">ผู้ป่วยในพื้นที่</span><span class="kv"><b id="kIn">0</b><small>คน</small></span></div>
+      <div class="kpi panel"><span class="kl">รอเฉลี่ย</span><span class="kv"><b id="kWait">0</b><small>นาที</small></span></div>
+      <div class="kpi panel"><span class="kl">ความหนาแน่น</span><span class="kv"><b id="kDen">0%</b><span class="lvl lv0" id="kLvl">ว่าง</span></span></div>
+      <div class="kpi panel hide-m"><span class="kl">เตียงผู้ป่วยใน</span><span class="kv"><b id="kBed">0</b><small id="kBedT"></small></span></div>
+    </div>
+  </div>
+  <div class="ctrls panel">
+    <button id="zIn" aria-label="ซูมเข้า"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button id="zOut" aria-label="ซูมออก"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+    <hr>
+    <button id="rL" aria-label="หมุนซ้าย"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+    <button id="rR" aria-label="หมุนขวา"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+    <button id="home" aria-label="มุมมองเริ่มต้น"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg></button>
+  </div>
+  <div class="bottom">
+    <div class="card panel" id="card">
+      <div class="empty" id="cEmpty"></div>
+      <div id="cBody" hidden>
+        <div class="chead"><div class="qno" id="cQ"></div><div class="ct"><div class="ctitle" id="cTitle"></div><div class="csub" id="cSub"></div></div><span class="badge" id="cBadge"></span></div>
+        <ol class="steps" id="cSteps"></ol>
+        <div class="cmeta" id="cMeta"></div>
+        <div class="cact" id="cAct"></div>
+      </div>
+    </div>
+    <div class="zones panel">
+      <div class="zhead"><b>จุดบริการ</b>
+        <label class="sw-l"><input type="checkbox" id="pcs" checked><span class="sw"></span>คอมพิวเตอร์</label>
+        <label class="sw-l"><input type="checkbox" id="rush" class="rush"><span class="sw"></span>เร่งด่วน</label>
+      </div>
+      <div class="zlist" id="zList"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="tag" id="tag"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const rand=(a,b)=>a+Math.random()*(b-a),randi=(a,b)=>Math.floor(rand(a,b+1));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+/* All layout coordinates are pixels of the uploaded plan (1449 x 780). World = px / 10. */
+const OX=720,OY=390,WX=x=>(x-OX)/10,WZ=y=>(y-OY)/10;
+
+/* ---------- buildings traced from the plan ---------- */
+const BUILDINGS=[
+  {n:'IPD',r:[115,28,280,258],d:[['b',222,26]]},
+  {n:'Mini',r:[315,28,492,248],d:[['b',345,26]]},
+  {n:'Dental',r:[648,28,836,115],d:[['b',700,24]]},
+  {n:'Management',r:[873,28,1090,162],d:[['b',925,24]]},
+  {n:'Laundry',r:[1147,42,1208,115],d:[['b',1185,18]]},
+  {n:'Kitchen',r:[1147,136,1230,222],d:[['t',1200,18]]},
+  {n:'Rehab TTM',r:[648,160,836,250],d:[['t',700,22],['t',760,22],['t',810,18]]},
+  {n:'Stores',r:[672,298,795,410],d:[['t',705,18],['t',780,16]]},
+  {n:'Drug Store',r:[843,296,910,408],d:[['t',875,18]]},
+  {n:'Driver',r:[940,266,1003,366],d:[['t',960,16]]},
+  {n:'Maintenance',r:[1014,266,1080,366],d:[['b',1030,16]]},
+  {n:'Main',r:[205,285,495,715],d:[['l',680,26],['r',600,26],['t',320,24],['b',470,24]]},
+  {n:'Center',r:[543,455,797,715],d:[['t',600,24],['b',570,28],['l',475,24],['r',600,24]]},
+  {n:'Security',r:[822,700,882,752],d:[['t',845,16]]},
+  {n:'PCU',r:[1050,403,1230,662],d:[['l',515,26]]}
+];
+// interior partitions [x1,y1,x2,y2,type]
+const PARTS=[
+  [205,400,240,400],[270,400,495,400],
+  [275,400,275,515],
+  [205,515,240,515],[270,515,275,515],[280,515,495,515,'counter'],
+  [205,655,300,655],[360,655,495,655],
+  [543,495,600,495],[625,495,650,495],[670,495,685,495],
+  [633,495,633,630],[685,495,685,630],
+  [543,642,690,642],
+  [740,545,740,590],[740,612,740,670],[740,690,740,715],
+  [735,160,735,250],[785,160,785,250],
+  [935,28,935,135],[937,135,1060,135],
+  [1050,560,1082,560],[1102,560,1160,560],[1160,403,1160,500],[1160,520,1160,662]
+];
+const LABELS=[
+  ['IPD',237,108],['Mini',440,152],['Dental',608,58],['Management',980,12],['Laundry',1226,103],['Kitchen',1188,195],
+  ['Rehab',607,185],['TTM',868,208],['IT Store / Drug Store',762,355],['Drug Store',876,380],['Driver',969,342],['Maintenance Store',1046,288],
+  ['NCD',245,302],['LAB',240,478],['Pharmacy',383,510],['OPD',471,570],['Claim + Register',310,675],
+  ['X-ray',590,608],['ANC',656,590],['LR',762,598],['ER',616,666],['Security',855,690],['PCU',1093,523]
+];
+
+/* computers as placed on the plan: [x,y,color r/y/g] */
+const PCS=[
+ [152,93,'y'],[183,93,'g'],[155,135,'g'],[183,120,'r'],[183,140,'g'],[157,236,'y'],
+ [443,98,'g'],[468,95,'y'],[443,123,'g'],[343,145,'g'],[380,172,'y'],[380,192,'g'],[333,211,'g'],[375,215,'g'],[348,232,'g'],
+ [745,101,'r'],[771,101,'g'],[797,101,'r'],[822,101,'r'],
+ [918,40,'y'],[952,40,'r'],[985,40,'y'],[1012,40,'r'],[1040,40,'r'],[918,72,'r'],[952,88,'r'],[985,88,'r'],[1012,88,'r'],[1040,88,'r'],[972,115,'g'],[1005,124,'r'],
+ [1188,8,'r'],[1160,72,'r'],[1163,152,'y'],
+ [672,230,'g'],[720,230,'g'],[752,230,'y'],[758,178,'y'],
+ [858,333,'g'],[982,280,'y'],
+ [252,333,'y'],[310,315,'r'],[310,343,'r'],[310,365,'r'],[258,365,'y'],[262,394,'r'],
+ [235,422,'y'],[235,442,'g'],[260,442,'r'],[290,422,'r'],[310,440,'r'],[340,438,'g'],[380,420,'r'],[407,420,'y'],[432,420,'r'],[465,435,'r'],[408,460,'r'],[407,483,'r'],[432,483,'r'],[480,485,'r'],[235,512,'g'],[300,505,'r'],
+ [258,568,'g'],[258,598,'g'],[258,630,'g'],[333,570,'r'],[365,570,'r'],[397,570,'y'],[430,570,'g'],
+ [270,703,'g'],[318,703,'g'],[393,703,'g'],[428,668,'r'],[440,703,'y'],[480,690,'y'],
+ [563,512,'y'],[607,535,'g'],[607,560,'g'],[650,610,'y'],
+ [560,700,'r'],[587,703,'y'],[613,688,'g'],[638,688,'r'],[752,662,'y'],[866,716,'r'],
+ [1088,412,'r'],[1120,412,'g'],[1145,412,'y'],[1070,472,'y'],[1105,472,'g'],[1145,460,'r'],[1145,533,'r'],[1065,575,'y'],[1115,575,'g'],[1065,610,'g'],[1210,580,'r']
+];
+const BEDS=[];
+for(let r=0;r<2;r++)for(let c=0;c<5;c++){BEDS.push({x:125+c*12,y:40+r*28,ward:'IPD'});BEDS.push({x:325+c*12,y:40+r*28,ward:'Mini'});}
+for(let r=0;r<2;r++)for(let c=0;c<2;c++)BEDS.push({x:125+c*16,y:178+r*28,ward:'IPD'});
+const LRBEDS=[[780,660],[780,676],[780,692],[780,706]];
+const TTMBEDS=[[795,205],[808,205],[821,205],[795,232],[808,232]];
+
+/* ---------- service zones ---------- */
+const ZONES=[
+  {key:'reg',name:'Claim + Register',step:'ลงทะเบียน',st:[[270,686],[318,686],[393,686],[440,686]],sd:[0,16],open:3,svc:[3,6],wait:[222,662,400,677],chairs:false,verb:'กำลังยื่นสิทธิ ลงทะเบียน'},
+  {key:'scr',name:'คัดกรอง OPD',step:'คัดกรอง',st:[[272,568],[272,598],[272,630]],sd:[-22,0],open:2,svc:[4,7],wait:[332,542,468,558],chairs:true,verb:'กำลังชั่งน้ำหนัก วัดความดัน'},
+  {key:'opd',name:'ตรวจ OPD',step:'พบแพทย์',st:[[333,586],[365,586],[397,586],[430,586]],sd:[0,-14],open:3,svc:[9,15],wait:[332,612,468,638],chairs:true,verb:'กำลังพบแพทย์'},
+  {key:'ncd',name:'NCD คลินิกโรคเรื้อรัง',step:'NCD',st:[[288,318],[288,345],[288,370]],sd:[18,0],open:2,svc:[8,13],wait:[348,298,448,384],chairs:true,verb:'กำลังพบแพทย์ NCD'},
+  {key:'lab',name:'LAB',step:'แล็บ',st:[[254,425],[254,447]],sd:[-18,0],open:2,svc:[4,7],wait:[214,468,264,506],chairs:false,verb:'กำลังเจาะเลือด'},
+  {key:'xray',name:'X-ray',step:'เอกซเรย์',st:[[588,565]],sd:[18,-20],open:1,svc:[5,8],wait:[692,575,733,636],chairs:true,verb:'กำลังเอกซเรย์'},
+  {key:'pha',name:'Pharmacy',step:'รับยา',st:[[340,526],[380,526],[420,526],[460,526]],sd:[0,-18],open:3,svc:[4,7],wait:[472,560,489,640],chairs:false,verb:'กำลังรับยา'},
+  {key:'dental',name:'Dental',step:'ทันตกรรม',st:[[745,88],[771,88],[797,88],[822,88]],sd:[0,-14],open:2,svc:[10,16],wait:[656,40,700,100],chairs:true,verb:'กำลังทำฟัน'},
+  {key:'anc',name:'ANC ฝากครรภ์',step:'ฝากครรภ์',st:[[652,524],[670,524]],sd:[0,-14],open:1,svc:[8,12],wait:[692,500,733,560],chairs:true,verb:'กำลังตรวจครรภ์'},
+  {key:'rehab',name:'Rehab กายภาพ',step:'กายภาพ',st:[[672,214],[720,214]],sd:[0,14],open:2,svc:[10,16],wait:[655,170,690,196],chairs:true,verb:'กำลังทำกายภาพ'},
+  {key:'ttm',name:'TTM แพทย์แผนไทย',step:'แผนไทย',st:[[797,218],[815,218]],sd:[0,-14],open:1,svc:[10,16],wait:[792,170,830,190],chairs:true,verb:'กำลังนวดรักษา'},
+  {key:'pcu',name:'PCU',step:'PCU',st:[[1070,592],[1115,592],[1145,520]],sd:[0,-14],open:2,svc:[6,10],wait:[1062,496,1138,540],chairs:true,verb:'กำลังรับบริการ PCU'},
+  {key:'er',name:'ER',step:'ER',st:[[600,668],[627,668],[668,668],[692,668]],sd:[0,18],open:4,svc:[16,26],wait:[556,620,630,636],chairs:false,verb:'กำลังรักษาฉุกเฉิน',beds:true}
+];
+const ZMAP={};ZONES.forEach(z=>ZMAP[z.key]=z);
+const TYPES=[
+  {key:'gen',name:'ทั่วไป',css:'#3B6FE0',hex:0x3B6FE0,code:'A',w:0.5},
+  {key:'ncd',name:'NCD',css:'#8B5CF6',hex:0x8B5CF6,code:'N',w:0.15},
+  {key:'den',name:'ทันตกรรม',css:'#14A3B8',hex:0x14A3B8,code:'D',w:0.08},
+  {key:'anc',name:'ฝากครรภ์',css:'#E0559A',hex:0xE0559A,code:'P',w:0.07},
+  {key:'reh',name:'กายภาพ แผนไทย',css:'#2E9E5B',hex:0x2E9E5B,code:'R',w:0.1},
+  {key:'pcu',name:'PCU',css:'#E08A1E',hex:0xE08A1E,code:'C',w:0.1},
+  {key:'er',name:'ฉุกเฉิน',css:'#D2443C',hex:0xD2443C,code:'E',w:0}
+];
+function routeFor(t){
+  if(t==='gen'){const r=['reg','scr','opd'];if(Math.random()<0.3)r.push('lab');if(Math.random()<0.15)r.push('xray');r.push('pha','exit');return r;}
+  if(t==='ncd'){const r=['reg','scr'];if(Math.random()<0.7)r.push('lab');r.push('ncd','pha','exit');return r;}
+  if(t==='den'){const r=['reg','dental'];if(Math.random()<0.5)r.push('pha');r.push('exit');return r;}
+  if(t==='anc'){const r=['reg','anc'];if(Math.random()<0.5)r.push('lab');r.push('pha','exit');return r;}
+  if(t==='reh')return['reg',Math.random()<0.55?'rehab':'ttm','exit'];
+  if(t==='pcu')return['pcu','exit'];
+  return['er',Math.random()<0.35?'ipd':'pha','exit'];
+}
+const STEPNAME={exit:'กลับบ้าน',ipd:'นอนโรงพยาบาล'};
+const ENTRY_MAIN=[172,682],ENTRY_PCU=[1006,515],ENTRY_ER=[566,738];
+
+/* ---------- walk grid & A* ---------- */
+const CS=5,GW=300,GH=160;
+const blocked=new Uint8Array(GW*GH),nearW=new Uint8Array(GW*GH);
+const gi=(cx,cy)=>cy*GW+cx;
+const WALLS=[];
+BUILDINGS.forEach(b=>{
+  const[x0,y0,x1,y1]=b.r;
+  const sides={t:[x0,y0,x1,y0],b:[x0,y1,x1,y1],l:[x0,y0,x0,y1],r:[x1,y0,x1,y1]};
+  Object.keys(sides).forEach(k=>{
+    const s=sides[k],horiz=k==='t'||k==='b',gaps=b.d.filter(d=>d[0]===k).map(d=>[d[1]-d[2]/2,d[1]+d[2]/2]).sort((a,c)=>a[0]-c[0]);
+    let start=horiz?s[0]:s[1];const end=horiz?s[2]:s[3];
+    gaps.forEach(g=>{if(g[0]>start)WALLS.push(horiz?[start,s[1],g[0],s[1],'out']:[s[0],start,s[0],g[0],'out']);start=g[1];});
+    if(end>start)WALLS.push(horiz?[start,s[1],end,s[1],'out']:[s[0],start,s[0],end,'out']);
+  });
+});
+PARTS.forEach(p=>WALLS.push([p[0],p[1],p[2],p[3],p[4]||'in']));
+/* exact geometry: distance from point to wall segment, and segment-vs-walls clearance */
+function ptSeg(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=t<0?0:t>1?1:t;return Math.hypot(px-ax-t*dx,py-ay-t*dy);}
+function wallDist(x,y){let m=1e9;for(const w of WALLS){const d=ptSeg(x,y,w[0],w[1],w[2],w[3]);if(d<m)m=d;}return m;}
+function crosses(a,b,w){const o=(p,q,rx,ry)=>(q[0]-p[0])*(ry-p[1])-(q[1]-p[1])*(rx-p[0]);
+  const d1=o(a,b,w[0],w[1]),d2=o(a,b,w[2],w[3]),d3=(w[2]-w[0])*(a[1]-w[1])-(w[3]-w[1])*(a[0]-w[0]),d4=(w[2]-w[0])*(b[1]-w[1])-(w[3]-w[1])*(b[0]-w[0]);
+  return d1*d2<0&&d3*d4<0;}
+function clear(a,b,r){for(const w of WALLS){if(crosses(a,b,w))return false;if(r>0&&(ptSeg(w[0],w[1],a[0],a[1],b[0],b[1])<r||ptSeg(w[2],w[3],a[0],a[1],b[0],b[1])<r||ptSeg(a[0],a[1],w[0],w[1],w[2],w[3])<r||ptSeg(b[0],b[1],w[0],w[1],w[2],w[3])<r))return false;}return true;}
+/* a cell is walkable only if a person (radius ~3.3 px) standing at its centre stays clear of the wall */
+const BODY=3.6;
+for(let cy=0;cy<GH;cy++)for(let cx=0;cx<GW;cx++){const x=(cx+.5)*CS,y=(cy+.5)*CS;if(x<80||x>1290||y<-20||y>800)continue;if(wallDist(x,y)<BODY)blocked[gi(cx,cy)]=1;}
+for(let cy=1;cy<GH-1;cy++)for(let cx=1;cx<GW-1;cx++){if(blocked[gi(cx,cy)])continue;for(let dy=-1;dy<=1&&!nearW[gi(cx,cy)];dy++)for(let dx=-1;dx<=1;dx++)if(blocked[gi(cx+dx,cy+dy)]){nearW[gi(cx,cy)]=1;break;}}
+/* nearest walkable cell that can be reached from (x,y) without crossing a wall */
+function freeNear(x,y){
+  const cx=clamp(Math.floor(x/CS),0,GW-1),cy=clamp(Math.floor(y/CS),0,GH-1);
+  let best=null,bd=1e9;
+  for(let r=0;r<10;r++){
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;const nx=cx+dx,ny=cy+dy;
+      if(nx<0||ny<0||nx>=GW||ny>=GH||blocked[gi(nx,ny)])continue;
+      const px=(nx+.5)*CS,py=(ny+.5)*CS,d=Math.hypot(px-x,py-y);
+      if(d<bd&&clear([x,y],[px,py],0)){bd=d;best=[nx,ny];}
+    }
+    if(best&&bd<=(r+0.5)*CS)break;
+  }
+  return best||[cx,cy];
+}
+const gScore=new Float32Array(GW*GH),came=new Int32Array(GW*GH),seen=new Uint32Array(GW*GH),shut=new Uint32Array(GW*GH);let stamp=0;
+function astar(sx,sy,tx,ty){
+  const s=freeNear(sx,sy),t=freeNear(tx,ty),S=gi(s[0],s[1]),T=gi(t[0],t[1]);
+  stamp++;const heap=[];const push=(n,f)=>{heap.push([f,n]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;[heap[p],heap[i]]=[heap[i],heap[p]];i=p;}};
+  const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;[heap[m],heap[i]]=[heap[i],heap[m]];i=m;}}return top[1];};
+  const h=n=>{const dx=Math.abs(n%GW-t[0]),dy=Math.abs((n/GW|0)-t[1]);return(Math.max(dx,dy)+0.414*Math.min(dx,dy))*1.2;};
+  seen[S]=stamp;gScore[S]=0;came[S]=-1;push(S,h(S));let iter=0;
+  while(heap.length&&iter++<200000){
+    const n=pop();if(n===T)break;if(shut[n]===stamp)continue;shut[n]=stamp;
+    const nx=n%GW,ny=n/GW|0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;const x=nx+dx,y=ny+dy;if(x<0||y<0||x>=GW||y>=GH)continue;
+      const m=gi(x,y);if(blocked[m])continue;
+      if(dx&&dy&&(blocked[gi(nx+dx,ny)]||blocked[gi(nx,ny+dy)]))continue;
+      const g=gScore[n]+(dx&&dy?1.414:1)*(nearW[m]?2.2:1);
+      if(seen[m]!==stamp||g<gScore[m]){seen[m]=stamp;gScore[m]=g;came[m]=n;push(m,g+h(m));}
+    }
+  }
+  const tgt=[tx,ty];
+  if(seen[T]!==stamp)return[tgt];
+  const cells=[[sx,sy]];const rev=[];for(let n=T;n!==-1;n=came[n])rev.push([(n%GW+0.5)*CS,((n/GW|0)+0.5)*CS]);
+  for(let i=rev.length-1;i>=0;i--)cells.push(rev[i]);cells.push(tgt);
+  /* string-pull: skip corners only while the straight line keeps a body-width away from every wall */
+  const rEnd=clamp(Math.min(wallDist(sx,sy),wallDist(tx,ty))-0.3,0.3,BODY-0.4);
+  const out=[];let i=0;
+  while(i<cells.length-1){
+    let j=i+1;
+    while(j+1<cells.length&&clear(cells[i],cells[j+1],(j+1===cells.length-1||i===0)?rEnd:BODY-0.4))j++;
+    out.push(cells[j]);i=j;
+  }
+  return out;
+}
+
+/* ---------- three ---------- */
+const stage=$('#stage');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+const canvas=renderer.domElement;
+const scene=new THREE.Scene();
+const cam=new THREE.OrthographicCamera(-1,1,1,-1,-400,800);
+const hemi=new THREE.HemisphereLight(0xffffff,0xbfd6d0,0.82);
+const sun=new THREE.DirectionalLight(0xffffff,0.62);
+sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-90,right:90,top:90,bottom:-90,near:1,far:300});sun.shadow.bias=-0.0006;
+scene.add(hemi,sun,sun.target);
+const matCache={},geoCache={};
+function M(c,o){const k=c+(o?JSON.stringify(o):'');return matCache[k]||(matCache[k]=new THREE.MeshLambertMaterial(Object.assign({color:c},o||{})));}
+function G(w,h,d){const k=w+','+h+','+d;return geoCache[k]||(geoCache[k]=new THREE.BoxGeometry(w,h,d));}
+function box(w,h,d,m,x,y,z,noCast){const mesh=new THREE.Mesh(G(w,h,d),typeof m==='number'?M(m):m);mesh.position.set(x,y,z);mesh.castShadow=!noCast;mesh.receiveShadow=true;scene.add(mesh);return mesh;}
+const dark=()=>{const t=document.documentElement.dataset.theme;return t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);};
+const P=dark()?{bg:0x0F1E1C,grass:0x1D3A31,pave:0x33433F,floor:0xCAD6D3,wall:0xE3EAE8,tint:[0x6FC79A,0xE8C25E,0xE57B72]}
+               :{bg:0xE6EEEC,grass:0xCFE3CC,pave:0xE8ECEB,floor:0xF7FAF9,wall:0xFFFFFF,tint:[0xB5E6CB,0xF6DC95,0xF3ACA6]};
+scene.background=new THREE.Color(P.bg);
+const TEAL=0x0E8C7F;
+
+box(400,0.2,300,P.grass,0,-0.25,0,true);
+box(WX(1270)-WX(90),0.1,WZ(775)-WZ(-10),P.pave,(WX(90)+WX(1270))/2,-0.1,(WZ(-10)+WZ(775))/2,true);
+// covered walkway (the long line on the plan)
+box(1.2,0.12,WZ(455)-WZ(275),0xC9D6D3,WX(546),3.0,(WZ(275)+WZ(455))/2);
+box(WX(580)-WX(495),0.12,1.2,0xC9D6D3,(WX(495)+WX(580))/2,3.0,WZ(278));
+// floors
+BUILDINGS.forEach(b=>{const[x0,y0,x1,y1]=b.r;box((x1-x0)/10,0.12,(y1-y0)/10,P.floor,WX((x0+x1)/2),0.02,WZ((y0+y1)/2),true);});
+// walls
+WALLS.forEach(w=>{
+  const[x1,y1,x2,y2,t]=w,len=Math.hypot(x2-x1,y2-y1)/10;if(len<0.05)return;
+  const h=t==='out'?1.9:t==='counter'?1.0:1.5,horiz=y1===y2;
+  const m=box(horiz?len:0.22,h,horiz?0.22:len,t==='counter'?0xDCC6A6:P.wall,WX((x1+x2)/2),h/2,WZ((y1+y2)/2));
+  if(t==='out')box(horiz?len:0.26,0.12,horiz?0.26:len,TEAL,WX((x1+x2)/2),h+0.06,WZ((y1+y2)/2),true);
+});
+// stairs from the plan
+[[188,265],[185,650],[1035,515],[560,465],[1075,152],[1210,500]].forEach(s=>{for(let k=0;k<4;k++)box(1.6,0.12+k*0.12,0.5,0xC9CFCE,WX(s[0]),0.06+k*0.06,WZ(s[1])+k*0.45-0.7,true);});
+// beds
+const bedM=M(0xEEF3F6),sheetM=M(0x9FD3CC);
+function bed(x,y,rot){const b=box(1.0,0.55,1.9,bedM,WX(x),0.35,WZ(y));const s=box(1.02,0.08,1.2,sheetM,WX(x),0.66,WZ(y)+0.2,true);if(rot){b.rotation.y=s.rotation.y=Math.PI/2;}}
+BEDS.forEach(b=>bed(b.x,b.y));LRBEDS.forEach(b=>bed(b[0],b[1],true));TTMBEDS.forEach(b=>bed(b[0],b[1]));
+ZMAP.er.st.forEach(s=>bed(s[0],s[1]));
+// dental chairs
+ZMAP.dental.st.forEach(s=>{box(0.8,0.5,1.6,0x5FB4C9,WX(s[0]),0.4,WZ(s[1])+0.2);});
+// conference table in PCU, desk in management
+box(3,0.7,1.4,0xDCC6A6,WX(1190),0.35,WZ(582));
+// ambulance
+const amb=new THREE.Group();
+{const add=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(G(w,h,d),M(c));m.position.set(x,y,z);m.castShadow=true;amb.add(m);};
+ add(4.4,1.9,2,0xF4F7F8,0,1.25,0);add(1.4,1.5,2,0xF4F7F8,2.8,1.05,0);add(0.05,0.7,1.7,0x24304F,3.52,1.4,0);add(5.8,0.35,2.02,0xD2443C,0.7,0.9,0);add(0.5,0.22,0.9,0xD2443C,0,2.3,0);}
+amb.position.set(WX(520),0,WZ(735));scene.add(amb);
+const ambState={mode:'park',t:0};
+
+/* computers */
+const pcGroup=new THREE.Group();scene.add(pcGroup);
+const PC_COL={r:0xE5484D,y:0xF2C230,g:0x2E9E5B},PC_CSS={r:'#E5484D',y:'#D9A90C',g:'#2E9E5B'},PC_NAME={r:'แดง',y:'เหลือง',g:'เขียว'};
+const pcMats={};Object.keys(PC_COL).forEach(k=>pcMats[k]=new THREE.MeshLambertMaterial({color:PC_COL[k],emissive:PC_COL[k],emissiveIntensity:.25}));
+const pcOff=M(0x39424A);
+function roomOf(x,y){
+  const room=LABELS.map(l=>({n:l[0],d:Math.hypot(l[1]-x,l[2]-y)})).sort((a,b)=>a.d-b.d)[0];
+  const b=BUILDINGS.find(b=>x>=b.r[0]-4&&x<=b.r[2]+4&&y>=b.r[1]-4&&y<=b.r[3]+4);
+  if(b&&['Main','Center','Rehab TTM','Stores'].includes(b.n))return room.n;
+  return b?(b.n==='Rehab TTM'?room.n:b.n):room.n;
+}
+const pcs=PCS.map((p,i)=>{
+  const g=new THREE.Group();g.position.set(WX(p[0]),0,WZ(p[1]));
+  const d=new THREE.Mesh(G(1.1,0.75,0.6),M(0xDCC6A6));d.position.y=0.375;d.castShadow=true;g.add(d);
+  const mon=new THREE.Mesh(G(0.7,0.5,0.08),pcMats[p[2]]);mon.position.set(0,1.05,-0.1);g.add(mon);
+  const st=new THREE.Mesh(G(0.08,0.25,0.08),M(0x39424A));st.position.set(0,0.85,-0.1);g.add(st);
+  pcGroup.add(g);
+  return{id:'PC-'+String(i+1).padStart(2,'0'),x:p[0],y:p[1],c:p[2],room:roomOf(p[0],p[1]),mon,g};
+});
+function applyPcs(on){pcs.forEach(p=>p.mon.material=on?pcMats[p.c]:pcOff);}
+
+/* camera */
+const view={tx:0,tz:0,zoom:1,az:0.42,azT:0.42,el:0.78,goal:null};
+let viewH=60;
+function updateCam(){
+  const w=stage.clientWidth,h=stage.clientHeight,asp=w/h;
+  viewH=Math.max(70,110/asp)/view.zoom;
+  cam.left=-viewH*asp/2;cam.right=viewH*asp/2;cam.top=viewH/2;cam.bottom=-viewH/2;cam.updateProjectionMatrix();
+  const d=180,ce=Math.cos(view.el);
+  cam.position.set(view.tx+Math.sin(view.az)*ce*d,Math.sin(view.el)*d,view.tz+Math.cos(view.az)*ce*d);cam.lookAt(view.tx,0,view.tz);
+  sun.position.set(view.tx-40,90,view.tz+50);sun.target.position.set(view.tx,0,view.tz);
+}
+function resize(){renderer.setSize(stage.clientWidth,stage.clientHeight,false);updateCam();}
+window.addEventListener('resize',resize);
+function pan(dx,dy){view.goal=null;const upp=viewH/stage.clientHeight,s=Math.sin(view.az),c=Math.cos(view.az);view.tx-=c*dx*upp;view.tz+=s*dx*upp;const k=dy*upp/Math.sin(view.el);view.tx-=s*k;view.tz-=c*k;view.tx=clamp(view.tx,-70,70);view.tz=clamp(view.tz,-45,45);}
+const clampZ=z=>clamp(z,0.6,5);
+const ptrs=new Map();let downPos=null,moved=false,pinch0=null;
+const pdist=()=>{const a=[...ptrs.values()];return Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1;};
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1){downPos={x:e.clientX,y:e.clientY};moved=false;}else{moved=true;pinch0={d:pdist(),z:view.zoom};}});
+canvas.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;if(ptrs.size===1){if(!moved&&Math.hypot(e.clientX-downPos.x,e.clientY-downPos.y)>6)moved=true;if(moved)pan(dx,dy);}else if(ptrs.size===2&&pinch0){view.goal=null;view.zoom=clampZ(pinch0.z*pdist()/pinch0.d);}});
+function endPtr(e){if(!ptrs.has(e.pointerId))return;if(ptrs.size===1&&!moved&&e.type==='pointerup')pick(e);ptrs.delete(e.pointerId);if(ptrs.size<2)pinch0=null;if(ptrs.size===1)moved=true;}
+canvas.addEventListener('pointerup',endPtr);canvas.addEventListener('pointercancel',endPtr);
+canvas.addEventListener('wheel',e=>{e.preventDefault();view.goal=null;view.zoom=clampZ(view.zoom*Math.exp(-e.deltaY*0.0015));},{passive:false});
+$('#zIn').onclick=()=>{view.goal=null;view.zoom=clampZ(view.zoom*1.25);};
+$('#zOut').onclick=()=>{view.goal=null;view.zoom=clampZ(view.zoom/1.25);};
+$('#rL').onclick=()=>view.azT-=Math.PI/4;$('#rR').onclick=()=>view.azT+=Math.PI/4;
+$('#home').onclick=()=>{view.goal={tx:0,tz:0,zoom:1};view.azT=0.42+Math.round((view.az-0.42)/(2*Math.PI))*2*Math.PI;};
+
+/* figures */
+const legGeo=new THREE.CylinderGeometry(0.2,0.18,0.7,8);legGeo.translate(0,0.35,0);
+const torsoGeo=new THREE.CylinderGeometry(0.28,0.33,0.75,10);torsoGeo.translate(0,1.07,0);
+const headGeo=new THREE.SphereGeometry(0.26,10,8);
+const SKIN=[0xF1C7A1,0xE0AC85,0xC98E66,0xF5D5B8];
+function person(c,l,s){const g=new THREE.Group();const lg=new THREE.Mesh(legGeo,M(l));lg.castShadow=true;g.add(lg);const t=new THREE.Mesh(torsoGeo,M(c));t.castShadow=true;g.add(t);const h=new THREE.Mesh(headGeo,M(SKIN[randi(0,3)]));h.position.y=1.72;h.castShadow=true;g.add(h);g.scale.setScalar(s||1);g.userData.legs=lg;return g;}
+
+/* zone setup */
+ZONES.forEach(z=>{
+  z.queue=[];z.waits=[];z.lvl=0;z.lastToast=-99;z.served=0;
+  const[x0,y0,x1,y1]=z.wait;
+  z.mat=new THREE.MeshLambertMaterial({color:P.floor,transparent:true,opacity:.85});
+  const pad=6,fl=box((x1-x0+pad*2)/10,0.04,(y1-y0+pad*2)/10,z.mat,WX((x0+x1)/2),0.1,WZ((y0+y1)/2),true);fl.userData={kind:'zone',ref:z};z.floor=fl;
+  z.slots=[];
+  const sp=z.chairs?12:11;
+  for(let y=y0+4;y<=y1;y+=sp)for(let x=x0+4;x<=x1;x+=sp){
+    if(blocked[gi(Math.floor(x/CS),Math.floor(y/CS))])continue;
+    z.slots.push({x,y,p:null,seat:z.chairs});
+    if(z.chairs){box(0.7,0.12,0.6,0x2E86AB,WX(x),0.5,WZ(y));box(0.7,0.5,0.1,0x2E86AB,WX(x),0.75,WZ(y)+0.3);}
+  }
+  z.stations=z.st.map((s,i)=>{
+    const sp=person(z.key==='er'||z.key==='opd'||z.key==='ncd'||z.key==='dental'?0xFFFFFF:0x7FC8BE,0x2B6F68);
+    sp.position.set(WX(s[0]+z.sd[0]),0,WZ(s[1]+z.sd[1]));sp.rotation.y=Math.atan2(-z.sd[0],-z.sd[1]);sp.visible=i<z.open;scene.add(sp);
+    return{i,x:s[0],y:s[1],p:null,open:i<z.open,closing:false,staff:sp};
+  });
+});
+const beds=BEDS.map(b=>({x:b.x,y:b.y,ward:b.ward,p:null}));
+
+/* patients */
+const patients=[];let T=0,served=0,spawnT=0,erT=12,hnNo=670000+randi(0,9000);const seq={};TYPES.forEach(t=>seq[t.code]=randi(1,9));
+const ring=new THREE.Mesh(new THREE.RingGeometry(0.6,0.8,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:TEAL,transparent:true,opacity:.9,depthWrite:false}));ring.position.y=0.12;ring.visible=false;scene.add(ring);
+let selected=null,selZone=null,selPc=null;
+function pickType(){let r=Math.random();for(const t of TYPES){if((r-=t.w)<=0)return t;}return TYPES[0];}
+function spawn(type){
+  const t=type||pickType();seq[t.code]++;hnNo+=randi(1,40);
+  const p={code:t.code+String(seq[t.code]).padStart(3,'0'),hn:'HN '+String(hnNo).replace(/(\d{2})(\d+)/,'$1-$2'),type:t,age:randi(1,88),route:routeFor(t.key),ri:-1,
+    x:0,y:0,wps:[],onArrive:null,zone:null,slot:null,station:null,bed:null,mode:'walk',svcT:0,waitStart:0,arrival:T,vitals:null,phase:Math.random()*6,lying:false};
+  const e=t.key==='pcu'?ENTRY_PCU:t.key==='er'?ENTRY_ER:ENTRY_MAIN;p.x=e[0]+rand(-6,6);p.y=e[1]+rand(-6,6);p.exitPt=e;
+  if(t.key==='anc')p.age=randi(18,40);if(t.key==='ncd')p.age=randi(40,88);
+  p.g=person(t.hex,0x3C4A5E,1);scene.add(p.g);sync(p);patients.push(p);nextStage(p);return p;
+}
+function sync(p){p.g.position.x=WX(p.x);p.g.position.z=WZ(p.y);}
+function goTo(p,tx,ty,cb){p.wps=astar(p.x,p.y,tx,ty);p.onArrive=cb;}
+/* lie along the bed's long axis (Z), head at the pillow end */
+function setLie(p,on){p.lying=on;p.g.rotation.set(on?-Math.PI/2:0,0,0);p.g.position.y=on?0.92:0;p.g.userData.legs.visible=true;}
+const LIE_OFF=0.95;
+function setSit(p,on){p.g.userData.legs.visible=!on;p.g.position.y=on?0.05:0;}
+function nextStage(p){
+  p.ri++;const key=p.route[p.ri];setSit(p,false);if(p.lying)setLie(p,false);
+  if(key==='exit'){p.zone=null;p.mode='exit';goTo(p,p.exitPt[0],p.exitPt[1],()=>{scene.remove(p.g);patients.splice(patients.indexOf(p),1);served++;if(selected===p)select(null);});return;}
+  if(key==='ipd'){
+    const b=beds.find(b=>!b.p);p.zone=null;
+    if(!b){p.route.splice(p.ri,1,'pha');p.ri--;nextStage(p);return;}
+    b.p=p;p.bed=b;p.mode='walk';p.admitTo=b.ward;
+    goTo(p,b.x,b.y+4,()=>{p.mode='admit';p.svcT=rand(60,140);setLie(p,true);p.g.position.x=WX(b.x);p.g.position.z=WZ(b.y)+LIE_OFF;});
+    return;
+  }
+  const z=ZMAP[key];p.zone=z;p.mode='walk';z.queue.push(p);p.arrived=false;
+  const s=z.slots.find(s=>!s.p);let tx,ty;
+  if(s){s.p=p;p.slot=s;tx=s.x;ty=s.y;}else{tx=rand(z.wait[0],z.wait[2]);ty=rand(z.wait[1],z.wait[3]);}
+  goTo(p,tx,ty,()=>{p.arrived=true;p.mode='wait';p.waitStart=T;if(p.slot&&p.slot.seat)setSit(p,true);});
+}
+function serve(z,dt){
+  z.stations.forEach(st=>{
+    if(st.p){const p=st.p;if(p.mode==='svc'){p.svcT-=dt;if(p.svcT<=0){st.p=null;p.station=null;z.served++;if(st.closing){st.open=false;st.closing=false;st.staff.visible=false;}nextStage(p);}}return;}
+    if(!st.open)return;
+    const p=z.queue.find(q=>q.arrived);if(!p)return;
+    z.queue.splice(z.queue.indexOf(p),1);if(p.slot){p.slot.p=null;p.slot=null;}setSit(p,false);
+    const w=T-p.waitStart;z.waits.push(w);if(z.waits.length>14)z.waits.shift();
+    st.p=p;p.station=st;p.mode='call';
+    goTo(p,st.x,st.y,()=>{p.mode='svc';p.svcT=rand(z.svc[0],z.svc[1]);p.g.rotation.y=Math.atan2(z.sd[0],z.sd[1]);
+      if(z.key==='scr'||z.key==='pcu'||z.key==='anc')p.vitals={wt:p.age<12?randi(10,40):randi(42,95),bp:randi(104,152)+'/'+randi(62,94)};
+      if(z.beds){setLie(p,true);p.g.position.x=WX(st.x);p.g.position.z=WZ(st.y)+LIE_OFF;}});
+  });
+}
+function move(p,dt){
+  if(p.mode==='admit'){p.svcT-=dt;if(p.svcT<=0){p.bed.p=null;p.bed=null;setLie(p,false);nextStage(p);}return;}
+  if(!p.wps.length||p.lying)return;
+  const tg=p.wps[0],dx=tg[0]-p.x,dy=tg[1]-p.y,d=Math.hypot(dx,dy),step=40*dt;
+  if(d<=step){p.x=tg[0];p.y=tg[1];p.wps.shift();sync(p);p.g.position.y=0;if(!p.wps.length){const cb=p.onArrive;p.onArrive=null;cb&&cb();}return;}
+  p.x+=dx/d*step;p.y+=dy/d*step;sync(p);p.phase+=dt*11;p.g.position.y=Math.abs(Math.sin(p.phase))*0.07;
+  const want=Math.atan2(dx,dy);let df=want-p.g.rotation.y;df=Math.atan2(Math.sin(df),Math.cos(df));p.g.rotation.y+=df*Math.min(1,dt*12);
+}
+function density(z){return z.queue.length/Math.max(4,z.slots.length);}
+const levelOf=r=>r<0.45?0:r<0.8?1:2;
+function tick(dt,quiet){
+  T+=dt;spawnT-=dt;
+  if(spawnT<=0){spawnT=$('#rush').checked?rand(0.6,1.0):rand(1.7,2.7);if(patients.length<170)spawn();}
+  erT-=dt;if(erT<=0&&ambState.mode==='park'){erT=rand(35,60)/($('#rush').checked?1.6:1);ambState.mode='in';ambState.t=0;}
+  if(ambState.mode==='in'){ambState.t+=dt;amb.position.x=WX(520)+(1-Math.min(1,ambState.t/3))*-14;if(ambState.t>3.2){ambState.mode='unload';ambState.t=0;const p=spawn(TYPES[6]);if(!quiet)toast('รถพยาบาลมาถึง ER ผู้ป่วยฉุกเฉิน '+p.code);}}
+  else if(ambState.mode==='unload'){ambState.t+=dt;if(ambState.t>6)ambState.mode='park';}
+  ZONES.forEach(z=>serve(z,dt));
+  for(let i=patients.length-1;i>=0;i--)move(patients[i],dt);
+  ZONES.forEach(z=>{const lv=levelOf(density(z));if(lv===2&&z.lvl<2&&!quiet&&T-z.lastToast>25){z.lastToast=T;toast(z.name+' หนาแน่น มีผู้รอ '+z.queue.length+' คน');}z.lvl=lv;});
+}
+const tintC=new THREE.Color();
+function tint(dt){ZONES.forEach(z=>{tintC.setHex(P.tint[z.lvl]);z.mat.color.lerp(tintC,Math.min(1,dt*2));});}
+
+/* pick */
+const tv=new THREE.Vector3(),ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function scr(v){tv.copy(v).project(cam);return{x:(tv.x+1)/2*stage.clientWidth,y:(1-tv.y)/2*stage.clientHeight};}
+function pick(e){
+  const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  let best=null,bd=24;
+  patients.forEach(p=>{const s=scr(tv.set(p.g.position.x,1,p.g.position.z));const d=Math.hypot(s.x-mx,s.y-my);if(d<bd){bd=d;best=p;}});
+  if(best){select(best);return;}
+  if($('#pcs').checked){let bp=null,bpd=20;pcs.forEach(p=>{const s=scr(tv.set(p.g.position.x,1,p.g.position.z));const d=Math.hypot(s.x-mx,s.y-my);if(d<bpd){bpd=d;bp=p;}});if(bp){selectPc(bp);return;}}
+  ndc.set(mx/r.width*2-1,-(my/r.height)*2+1);ray.setFromCamera(ndc,cam);
+  const hit=ray.intersectObjects(ZONES.map(z=>z.floor))[0];
+  if(hit){selectZone(hit.object.userData.ref,false);return;}
+  select(null);
+}
+function clearSel(){selected=selZone=selPc=null;ring.visible=false;actSig='';}
+function select(p){clearSel();selected=p;ring.visible=!!p;updateUI();}
+function selectZone(z,focus){clearSel();selZone=z;if(focus){const c=[(z.wait[0]+z.wait[2])/2,(z.wait[1]+z.wait[3])/2];view.goal={tx:WX(c[0]),tz:WZ(c[1]),zoom:2.6};}updateUI();}
+function selectPc(p){clearSel();selPc=p;ring.visible=true;ring.position.set(p.g.position.x,0.12,p.g.position.z);updateUI();}
+
+/* UI */
+let toastTimer=0;function toast(m){const el=$('#toast');el.textContent=m;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2800);}
+const pcCount={r:0,y:0,g:0};pcs.forEach(p=>pcCount[p.c]++);
+function emptyHTML(){
+  return '<b>แตะผู้ป่วย จุดบริการ หรือคอมพิวเตอร์ เพื่อดูข้อมูล</b><span class="hide-m"><br>ผังห้องทั้งหมดสร้างตามไฟล์ที่แนบ สีพื้นบอกความแออัด เขียว ว่าง เหลือง ปานกลาง แดง แน่น</span>'+
+  '<div class="legend hide-m">'+TYPES.map(t=>'<span><i style="background:'+t.css+'"></i>'+t.code+' '+t.name+'</span>').join('')+'</div>'+
+  '<div class="legend">คอมพิวเตอร์ตามแผนผัง '+pcs.length+' เครื่อง '+['r','y','g'].map(c=>'<span><i style="background:'+PC_CSS[c]+'"></i>'+PC_NAME[c]+' '+pcCount[c]+'</span>').join('')+'</div>';
+}
+$('#cEmpty').innerHTML=emptyHTML();
+const labelsEl=$('#labels');
+const roomLabels=LABELS.map(l=>{const el=document.createElement('div');el.className='zl room';el.textContent=l[0];labelsEl.appendChild(el);return{el,v:new THREE.Vector3(WX(l[1]),2.9,WZ(l[2]))};});
+ZONES.forEach(z=>{const el=document.createElement('div');el.className='zl';el.innerHTML='<span>'+z.name+'</span><em></em>';labelsEl.appendChild(el);z.label=el;z.lv=new THREE.Vector3(WX((z.wait[0]+z.wait[2])/2),3.4,WZ((z.wait[1]+z.wait[3])/2));});
+const zList=$('#zList');
+ZONES.forEach(z=>{const b=document.createElement('button');b.className='zrow';b.innerHTML='<span class="zn"></span><span class="zc"></span><span class="bar"><i></i></span>';b.querySelector('.zn').textContent=z.name;b.onclick=()=>selectZone(z,true);zList.appendChild(b);z.row=b;});
+const LV_CSS=['var(--free)','var(--mid)','var(--full)'],LV_SOFT=['var(--free-soft)','var(--mid-soft)','var(--full-soft)'],LEVEL_TXT=['ว่าง','ปานกลาง','แน่น'];
+const avgWait=z=>z.waits.length?z.waits.reduce((a,b)=>a+b,0)/z.waits.length:0;
+function statusText(p){
+  const z=p.zone;
+  if(p.mode==='exit')return'กำลังกลับบ้าน';
+  if(p.mode==='admit')return'นอนพักที่ '+p.admitTo;
+  if(p.mode==='walk')return z?'เดินไป '+z.name:'ย้ายไปหอผู้ป่วย '+(p.admitTo||'');
+  if(p.mode==='call')return'ถูกเรียกคิว';
+  if(p.mode==='wait')return'รอ'+z.step+' ลำดับที่ '+(z.queue.filter(q=>q.arrived).indexOf(p)+1);
+  if(p.mode==='svc')return z.verb;
+  return'';
+}
+let actSig='';
+function updateUI(){
+  const mins=8*60+Math.floor(T);$('#clock').textContent=String(Math.floor(mins/60)%24).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+  $('#kIn').textContent=patients.length;
+  const ws=ZONES.filter(z=>z.waits.length);$('#kWait').textContent=ws.length?Math.round(ws.reduce((a,z)=>a+avgWait(z),0)/ws.length):0;
+  const waiting=ZONES.reduce((a,z)=>a+z.queue.length,0),seats=ZONES.reduce((a,z)=>a+Math.max(4,z.slots.length),0),ratio=waiting/seats,lv=levelOf(ratio*1.25);
+  $('#kDen').textContent=Math.round(ratio*100)+'%';const kl=$('#kLvl');kl.textContent=LEVEL_TXT[lv];kl.className='lvl lv'+lv;
+  $('#kBed').textContent=beds.filter(b=>b.p).length;$('#kBedT').textContent='/'+beds.length+' เตียง';
+  ZONES.forEach(z=>{const n=z.queue.length,cap=Math.max(4,z.slots.length);
+    z.row.classList.toggle('sel',z===selZone);z.row.querySelector('.zc').textContent=n+'/'+cap+'  ~'+Math.round(avgWait(z))+' น.';
+    const bi=z.row.querySelector('.bar i');bi.style.width=Math.min(100,n/cap*100)+'%';bi.style.background=LV_CSS[z.lvl];
+    const em=z.label.querySelector('em');em.textContent=n+' คน';em.style.background=LV_SOFT[z.lvl];em.style.color=LV_CSS[z.lvl];});
+  const p=selected,z=selZone,pc=selPc;
+  $('#cEmpty').hidden=!!(p||z||pc);$('#cBody').hidden=!(p||z||pc);
+  const q=$('#cQ'),b=$('#cBadge'),st=$('#cSteps');
+  if(p){
+    q.textContent=p.code;q.style.background=p.type.css;
+    $('#cTitle').textContent=p.type.name;$('#cSub').textContent=p.hn+'  อายุ '+p.age+' ปี';
+    b.textContent=statusText(p);const waited=p.mode==='wait'?T-p.waitStart:0;
+    b.className='badge'+(p.mode==='svc'||p.mode==='admit'?' ok':'')+(waited>30?' bad':waited>15?' warn':'');
+    const labels=p.route.map(k=>STEPNAME[k]||ZMAP[k].step);st.style.gridTemplateColumns='repeat('+labels.length+',1fr)';
+    st.innerHTML=labels.map((l,i)=>'<li class="'+(i<p.ri?'done':i===p.ri?'cur':'')+'"><span class="dot"></span>'+l+'</li>').join('');
+    let meta='';if(p.mode==='wait')meta+='รอมาแล้ว <b>'+Math.round(waited)+' นาที</b>  ';if(p.mode==='svc')meta+='คาดว่าเสร็จใน <b>'+Math.max(1,Math.ceil(p.svcT))+' นาที</b>  ';
+    meta+='อยู่ใน รพ. <b>'+Math.round(T-p.arrival)+' นาที</b>';if(p.vitals)meta+='<br>น้ำหนัก <b>'+p.vitals.wt+' กก.</b>  ความดัน <b>'+p.vitals.bp+'</b>';
+    $('#cMeta').innerHTML=meta;if(actSig!=='p'){actSig='p';$('#cAct').innerHTML='';}
+  }else if(pc){
+    q.textContent=pc.id.slice(3);q.style.background=PC_CSS[pc.c];
+    $('#cTitle').textContent=pc.id;$('#cSub').textContent='ห้อง '+pc.room;
+    b.textContent='สี'+PC_NAME[pc.c]+' ตามแผนผัง';b.className='badge'+(pc.c==='g'?' ok':pc.c==='y'?' warn':' bad');st.innerHTML='';
+    const same=pcs.filter(x=>x.room===pc.room),cnt={r:0,y:0,g:0};same.forEach(x=>cnt[x.c]++);
+    $('#cMeta').innerHTML='ในห้อง '+pc.room+' มี <b>'+same.length+' เครื่อง</b>  แดง <b>'+cnt.r+'</b>  เหลือง <b>'+cnt.y+'</b>  เขียว <b>'+cnt.g+'</b><br>ความหมายของสีอ้างอิงตามแผนผังต้นฉบับ';
+    if(actSig!=='pc'){actSig='pc';$('#cAct').innerHTML='';}
+  }else if(z){
+    q.textContent=z.key.toUpperCase().slice(0,4);q.style.background='var(--teal)';q.style.fontSize='14px';
+    $('#cTitle').textContent=z.name;const openN=z.stations.filter(s=>s.open&&!s.closing).length;
+    $('#cSub').textContent='เปิดให้บริการ '+openN+' จาก '+z.stations.length+(z.beds?' เตียง':' จุด');
+    b.textContent=LEVEL_TXT[z.lvl];b.className='badge'+(z.lvl===0?' ok':z.lvl===1?' warn':' bad');st.innerHTML='';
+    const next=z.queue.filter(q=>q.arrived).slice(0,6).map(q=>q.code).join(' '),inSvc=z.stations.filter(s=>s.p).map(s=>s.p.code).join(' ');
+    $('#cMeta').innerHTML='รอคิว <b>'+z.queue.length+' คน</b>  รอเฉลี่ย <b>'+Math.round(avgWait(z))+' นาที</b>  ให้บริการแล้ว <b>'+z.served+'</b><br>กำลังรับบริการ <b>'+(inSvc||'ไม่มี')+'</b><br>คิวถัดไป <b>'+(next||'ไม่มี')+'</b>';
+    const sig='z'+z.key+openN;
+    if(sig!==actSig){actSig=sig;const a=$('#cAct');a.innerHTML='';
+      const add=document.createElement('button');add.textContent='เปิดจุดบริการเพิ่ม';add.disabled=openN>=z.stations.length;
+      add.onclick=()=>{const s=z.stations.find(s=>!s.open||s.closing);if(s){s.open=true;s.closing=false;s.staff.visible=true;toast('เปิด '+z.name+' เพิ่ม 1 จุด');actSig='';updateUI();}};
+      const rm=document.createElement('button');rm.className='ghost';rm.textContent='ปิด 1 จุด';rm.disabled=openN<=1;
+      rm.onclick=()=>{const s=[...z.stations].reverse().find(s=>s.open&&!s.closing);if(s){if(s.p)s.closing=true;else{s.open=false;s.staff.visible=false;}toast('ปิด '+z.name+' 1 จุด');actSig='';updateUI();}};
+      a.append(add,rm);}
+  }else actSig='';
+  if(!z)q.style.fontSize='';
+}
+$('#rush').addEventListener('change',e=>toast(e.target.checked?'ช่วงเร่งด่วน ผู้ป่วยมาเพิ่มเกือบ 3 เท่า':'กลับสู่ช่วงปกติ'));
+$('#pcs').addEventListener('change',e=>{applyPcs(e.target.checked);if(!e.target.checked&&selPc)select(null);});
+$('#q').addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;const raw=e.target.value.trim(),q=raw.toLowerCase().replace(/\s|-/g,'');if(!q)return;
+  const pc=pcs.find(p=>p.id.toLowerCase().replace('-','')===q);if(pc){selectPc(pc);view.goal={tx:pc.g.position.x,tz:pc.g.position.z,zoom:3};e.target.blur();return;}
+  const z=ZONES.find(z=>z.name.toLowerCase().replace(/\s/g,'').includes(q)||z.key===q);if(z){selectZone(z,true);e.target.blur();return;}
+  const l=LABELS.find(l=>l[0].toLowerCase().replace(/\s/g,'').includes(q));if(l){view.goal={tx:WX(l[1]),tz:WZ(l[2]),zoom:2.6};e.target.blur();return;}
+  const p=patients.find(p=>p.code.toLowerCase()===q||p.hn.toLowerCase().replace(/\s|-/g,'').includes(q));
+  if(p){select(p);view.goal={tx:p.g.position.x,tz:p.g.position.z,zoom:3};e.target.blur();}else toast('ไม่พบ "'+raw+'"');
+});
+const tag=$('#tag');
+function placeOverlays(){
+  const w=stage.clientWidth,h=stage.clientHeight,showRooms=view.zoom>0.85;
+  roomLabels.forEach(l=>{if(!showRooms){l.el.style.display='none';return;}const s=scr(l.v);l.el.style.display='block';l.el.style.transform='translate('+s.x+'px,'+s.y+'px) translate(-50%,-50%)';});
+  ZONES.forEach(z=>{const s=scr(z.lv);const show=view.zoom>1.3||z.lvl>0;z.label.style.display=show?'flex':'none';z.label.style.transform='translate('+s.x+'px,'+s.y+'px) translate(-50%,-50%)';});
+  if(selected){const g=selected.g.position;ring.position.set(g.x,0.12,g.z);const s=scr(tv.set(g.x,selected.lying?2.2:3.2,g.z));tag.style.display='block';tag.textContent=selected.code+'  '+statusText(selected);tag.style.transform='translate('+s.x+'px,'+s.y+'px) translate(-50%,-100%)';}
+  else if(selPc){const s=scr(tv.set(selPc.g.position.x,2.2,selPc.g.position.z));tag.style.display='block';tag.textContent=selPc.id+'  '+selPc.room;tag.style.transform='translate('+s.x+'px,'+s.y+'px) translate(-50%,-100%)';}
+  else tag.style.display='none';
+}
+
+/* warm-up and loop */
+for(let i=0;i<900;i++)tick(0.1,true);
+ZONES.forEach(z=>z.mat.color.setHex(P.tint[z.lvl]));
+let last=performance.now(),uiT=0;
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  tick(dt,false);tint(dt);
+  if(view.goal){const g=view.goal,k=Math.min(1,dt*4);view.tx+=(g.tx-view.tx)*k;view.tz+=(g.tz-view.tz)*k;view.zoom+=(g.zoom-view.zoom)*k;if(Math.abs(g.tx-view.tx)<0.05&&Math.abs(g.zoom-view.zoom)<0.01)view.goal=null;}
+  view.az+=(view.azT-view.az)*Math.min(1,dt*7);
+  updateCam();renderer.render(scene,cam);placeOverlays();
+  uiT+=dt;if(uiT>0.3){uiT=0;updateUI();}
+  requestAnimationFrame(frame);
+}
+resize();updateUI();requestAnimationFrame(t=>{last=t;frame(t);});
+})();
+</script>
+</body>
+</html>
+
+</body></html>

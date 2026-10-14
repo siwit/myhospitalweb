@@ -53,6 +53,7 @@ require_once __DIR__ . '/session.php';
                     <a href="https://myhospital.moph.go.th/IM/index.php"  rel="noreferrer">MDC - Dashboard</a>  
                     <!-- target="_blank"  -->
                     <a href="service_schedule.php">ตารางคลินิกพิเศษ</a>
+                    <a href="service_waittime.php">ข้อมูลระยะเวลาการให้บริการ</a>
                     <a href="doctors.php">แพทย์ประจำโรงพยาบาล</a>
                     <a href="FAQ.php">คำถามที่พบบ่อย</a>
                 </div>
