@@ -2,7 +2,7 @@
     <iframe
         class="opd-twin-reference-frame"
         title="OPD Digital Twin 3D"
-        src="assets/OPD3D-digitaltwin-live.php?twin_date=<?= rawurlencode($twinDate); ?>"
+        src="assets/OPD3D-digitaltwin-live.php?twin_date=<?= rawurlencode($twinDate); ?>&v=hour-recipients-v11"
         loading="eager"
         style="display:block;width:100%;height:400px;min-height:180px;border:0;background:#f3f4f6;"></iframe>
 </section>

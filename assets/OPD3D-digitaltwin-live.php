@@ -25,6 +25,14 @@ try {
 } catch (Throwable $error) {
     error_log('OPD live twin: unable to read hourly data');
 }
+header('Content-Type: text/html; charset=UTF-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 $source = file_get_contents(__DIR__ . '/OPD3D-digitaltwin2.html');
-$injection = '<script>window.__OPD_TWIN_DATE__=' . json_encode($date, JSON_UNESCAPED_UNICODE) . ';window.__OPD_TWIN_LATEST_HOUR__=' . json_encode($latestHour) . ';window.__OPD_TWIN_ROWS__=' . json_encode($liveRows, JSON_UNESCAPED_UNICODE) . ';</script>';
+$injection = '<script>window.__OPD_TWIN_DATE__=' . json_encode($date, JSON_UNESCAPED_UNICODE)
+    . ';window.__OPD_TWIN_LATEST_HOUR__=' . json_encode($latestHour)
+    . ';window.__OPD_TWIN_ROWS__=' . json_encode($liveRows, JSON_UNESCAPED_UNICODE)
+    . ';window.__OPD_TWIN_UI_VER__="hour-recipients-v11";</script>';
 echo str_replace('</head>', $injection . '</head>', $source ?: '');

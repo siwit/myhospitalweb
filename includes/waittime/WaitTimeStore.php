@@ -45,12 +45,20 @@ class WaitTimeStore
             "ALTER TABLE waittime_visit_anon ADD COLUMN main_depcode VARCHAR(10) DEFAULT NULL AFTER is_er_visit",
             "ALTER TABLE waittime_visit_anon ADD COLUMN main_department VARCHAR(150) DEFAULT NULL AFTER main_depcode",
             "ALTER TABLE waittime_visit_anon ADD KEY idx_waittime_main_dep (main_depcode)",
+            "ALTER TABLE waittime_visit_anon ADD COLUMN cur_depcode VARCHAR(10) DEFAULT NULL AFTER pharmacy_department",
+            "ALTER TABLE waittime_visit_anon ADD COLUMN current_department VARCHAR(150) DEFAULT NULL AFTER cur_depcode",
+            "ALTER TABLE waittime_visit_anon ADD COLUMN wait_screen_minutes INT DEFAULT NULL AFTER current_department",
+            "ALTER TABLE waittime_visit_anon ADD COLUMN on_screen_minutes INT DEFAULT NULL AFTER wait_screen_minutes",
+            "ALTER TABLE waittime_visit_anon ADD KEY idx_waittime_cur_dep (cur_depcode)",
+            // ย้ายค่าจากชื่อเดิม (ถ้ามี) ไปชื่อใหม่
+            "UPDATE waittime_visit_anon SET wait_screen_minutes = wait_history_minutes WHERE wait_screen_minutes IS NULL AND wait_history_minutes IS NOT NULL",
+            "UPDATE waittime_visit_anon SET on_screen_minutes = history_minutes WHERE on_screen_minutes IS NULL AND history_minutes IS NOT NULL",
         ];
         foreach ($alters as $sql) {
             try {
                 $conn->exec($sql);
             } catch (PDOException $e) {
-                // duplicate column/key
+                // duplicate column/key หรือยังไม่มีคอลัมน์เก่า
             }
         }
     }
@@ -89,8 +97,8 @@ class WaitTimeStore
             SELECT
               COUNT(*) AS total_vn,
               ROUND(AVG(CASE WHEN total_opd_minutes BETWEEN 0 AND 720 THEN total_opd_minutes END), 1) AS avg_total_opd_minutes,
-              ROUND(AVG(CASE WHEN wait_history_minutes BETWEEN 0 AND 480 THEN wait_history_minutes END), 1) AS avg_wait_history_minutes,
-              ROUND(AVG(CASE WHEN history_minutes BETWEEN 0 AND 240 THEN history_minutes END), 1) AS avg_history_minutes,
+              ROUND(AVG(CASE WHEN wait_screen_minutes BETWEEN 0 AND 480 THEN wait_screen_minutes END), 1) AS avg_wait_screen_minutes,
+              ROUND(AVG(CASE WHEN on_screen_minutes BETWEEN 0 AND 240 THEN on_screen_minutes END), 1) AS avg_on_screen_minutes,
               ROUND(AVG(CASE WHEN wait_doctor_minutes BETWEEN 0 AND 480 THEN wait_doctor_minutes END), 1) AS avg_wait_doctor_minutes,
               ROUND(AVG(CASE WHEN doctor_minutes BETWEEN 0 AND 240 THEN doctor_minutes END), 1) AS avg_doctor_minutes,
               ROUND(AVG(CASE WHEN lab_total_minutes BETWEEN 0 AND 1440 THEN lab_total_minutes END), 1) AS avg_lab_wait_minutes,
@@ -202,8 +210,8 @@ class WaitTimeStore
             'synced_at' => $kpi['synced_at'] ?? null,
             'total_vn' => (int)($kpi['total_vn'] ?? 0),
             'avg_total_opd_minutes' => self::numOrNull($kpi['avg_total_opd_minutes'] ?? null),
-            'avg_wait_history_minutes' => self::numOrNull($kpi['avg_wait_history_minutes'] ?? null),
-            'avg_history_minutes' => self::numOrNull($kpi['avg_history_minutes'] ?? null),
+            'avg_wait_screen_minutes' => self::numOrNull($kpi['avg_wait_screen_minutes'] ?? null),
+            'avg_on_screen_minutes' => self::numOrNull($kpi['avg_on_screen_minutes'] ?? null),
             'avg_wait_doctor_minutes' => self::numOrNull($kpi['avg_wait_doctor_minutes'] ?? null),
             'avg_doctor_minutes' => self::numOrNull($kpi['avg_doctor_minutes'] ?? null),
             'avg_lab_wait_minutes' => self::numOrNull($kpi['avg_lab_wait_minutes'] ?? null),

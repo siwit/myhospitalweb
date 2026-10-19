@@ -82,10 +82,10 @@ SELECT
   d6.department AS pharmacy_department,
 
   /* รอซักประวัติ: ส่งตรวจ -> เริ่มซักประวัติ */
-  TIMESTAMPDIFF(MINUTE, {$arrive}, {$startScreen}) AS wait_history_minutes,
+  TIMESTAMPDIFF(MINUTE, {$arrive}, {$startScreen}) AS wait_screen_minutes,
 
   /* ซักประวัติ: เริ่ม -> เสร็จ */
-  TIMESTAMPDIFF(MINUTE, {$startScreen}, {$endScreen}) AS history_minutes,
+  TIMESTAMPDIFF(MINUTE, {$startScreen}, {$endScreen}) AS on_screen_minutes,
 
   /* รอแพทย์: ซักประวัติเสร็จ -> เริ่มตรวจ */
   TIMESTAMPDIFF(MINUTE, {$endScreen}, {$startDoctor}) AS wait_doctor_minutes,

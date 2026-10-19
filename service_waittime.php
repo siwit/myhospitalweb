@@ -431,13 +431,13 @@ include __DIR__ . '/includes/header.php';
 
             <div class="wt-kpi accent-blue">
                 <div class="wt-kpi-label">ระยะเวลารอซักประวัติเฉลี่ย</div>
-                <div class="wt-kpi-value"><?php echo wt_fmt($dash['avg_wait_history_minutes']); ?><span class="wt-kpi-unit">นาที/ราย</span></div>
+                <div class="wt-kpi-value"><?php echo wt_fmt($dash['avg_wait_screen_minutes'] ?? null); ?><span class="wt-kpi-unit">นาที/ราย</span></div>
                 <div class="wt-kpi-sub">ส่งบัตร → เริ่มซักประวัติ</div>
             </div>
 
             <div class="wt-kpi accent-blue">
                 <div class="wt-kpi-label">ระยะเวลาซักประวัติโดยเฉลี่ย</div>
-                <div class="wt-kpi-value"><?php echo wt_fmt($dash['avg_history_minutes']); ?><span class="wt-kpi-unit">นาที/ราย</span></div>
+                <div class="wt-kpi-value"><?php echo wt_fmt($dash['avg_on_screen_minutes'] ?? null); ?><span class="wt-kpi-unit">นาที/ราย</span></div>
                 <div class="wt-kpi-sub">เริ่มซักประวัติ → ซักประวัติเสร็จ</div>
             </div>
 

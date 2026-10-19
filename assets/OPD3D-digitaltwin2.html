@@ -109,7 +109,8 @@
 <div><b id="kLos">0%</b><span>ความหนาแน่น %</span></div>
     </div>
     <div class="sec">ช่วงเวลารายชั่วโมง</div>
-    <div id="list"></div>
+    <div id="hourList"></div>
+    <div id="list" hidden></div>
   </div>
 </div>
 
@@ -386,17 +387,20 @@ STATIONS.forEach(st => {
   st.door = st.door.map(([x, y]) => ({ x, y }));
   st.queue = []; st.waitSum = 0; st.waitN = 0; st.served = 0; st.busyTime = 0; st.sig = '';
   st.staff.forEach(([x, y]) => { const s = makePerson(matStaff); s.position.copy(toW(x, y)); scene.add(s); });
+  // ไม่แสดงป้ายหน้าห้อง "ลงทะเบียน"
+  if (st.id === 'reg') return;
   const c = document.createElement('canvas'); c.width = 384; c.height = 128;
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
   sp.scale.set(5.4, 1.8, 1); sp.renderOrder = 10;
   sp.position.copy(toW(st.badge[0], st.badge[1], 4.2)); scene.add(sp);
   sp.userData.info = { station: st.id }; sp.userData.base = sp.scale.clone(); hoverables.push(sp);
-  st.badgeC = c; st.badgeTex = tex;
+  st.badgeC = c; st.badgeTex = tex; st.badgeSp = sp;
 });
 const statusOf = n => n < 4 ? ['ปกติ', '#16a34a'] : n < 8 ? ['เริ่มหนาแน่น', '#d97706'] : ['แออัด', '#dc2626'];
 
 function drawBadge(st) {
+  if (!st.badgeC || !st.badgeTex) return;
   const live = liveRows.get(st.id), n = live ? Number(live.waiting || 0) : st.queue.length, busy = st.servers.filter(s => s.p).length;
   const sig = n + '|' + busy; if (sig === st.sig) return; st.sig = sig;
   const g = st.badgeC.getContext('2d');
@@ -405,7 +409,7 @@ function drawBadge(st) {
   g.beginPath(); g.roundRect(4, 4, 376, 120, 22); g.fill();
   g.fillStyle = '#fff'; g.textAlign = 'center';
   g.font = '600 46px Noto Sans Thai, Segoe UI'; g.fillText(st.name, 192, 46);
-  g.font = '700 60px Noto Sans Thai, Segoe UI'; g.fillText(`รอ ${n} คน · ${busy}/${st.servers.length}`, 192, 100);
+  g.font = '700 52px Noto Sans Thai, Segoe UI'; g.fillText(`ผู้ป่วยรอ ${n} คน`, 192, 100);
   st.badgeTex.needsUpdate = true;
 }
 
@@ -544,35 +548,73 @@ function simStep(dt) {
 const simMin = s => s * SIM_SCALE / 60;
 
 /* ================= PANEL ================= */
+const HOUR_SLOTS = {
+  6: '06:00-06:59 น.',
+  7: '07:00-07:59 น.',
+  8: '08:00-08:59 น.',
+  9: '09:00-09:59 น.',
+  10: '10:00-10:59 น.',
+  11: '11:00-11:59 น.',
+  12: '12:00-12:59 น.',
+  13: '13:00-13:59 น.',
+  14: '14:00-14:59 น.',
+  15: '15:00-15:59 น.',
+};
 const list = document.getElementById('list');
+const hourList = document.getElementById('hourList');
 let hourlyListRendered = false;
 function hourlySummary(rows) {
   const waiting = rows.reduce((sum, row) => sum + Number(row.waiting || 0), 0);
   const capacity = rows.reduce((sum, row) => sum + Number(row.capacity || 0), 0);
   const served = rows.reduce((sum, row) => sum + Number(row.served || 0), 0);
   const service = served ? rows.reduce((sum, row) => sum + Number(row.avg_service || 0) * Number(row.served || 0), 0) / served : 0;
-  return { waiting, capacity, served, density: capacity ? waiting / capacity * 100 : 0, service };
+  // จำนวนผู้รับบริการต่อช่วงเวลา: ใช้ served ถ้ามี ไม่เช่นนั้นใช้ waiting
+  const recipients = served > 0 ? served : waiting;
+  return { waiting, capacity, served, recipients, density: capacity ? waiting / capacity * 100 : 0, service };
+}
+function buildHourSlots() {
+  const nowH = new Date().getHours();
+  const dataHours = [...liveHourly.keys()].map(Number).filter((h) => Number.isFinite(h));
+  const latestFromData = dataHours.length ? Math.max(...dataHours) : null;
+  let latestHour;
+  if (LIVE_LATEST_HOUR !== null && Number.isFinite(Number(LIVE_LATEST_HOUR))) {
+    latestHour = Number(LIVE_LATEST_HOUR);
+  } else if (latestFromData !== null) {
+    latestHour = Math.max(latestFromData, Number(LIVE_HOUR) || 0);
+  } else {
+    latestHour = nowH;
+  }
+  const endHour = Math.max(6, Math.min(15, latestHour));
+  return Object.keys(HOUR_SLOTS).map(Number).filter((h) => h >= 6 && h <= endHour);
 }
 function renderHourlyList() {
-  if (!hasLiveData || hourlyListRendered) return;
+  // side panel: ช่วงเวลา + จำนวนผู้รับบริการต่อชั่วโมง (ไม่ใช่รายจุดบริการ)
+  if (hourlyListRendered || !hourList) return;
   hourlyListRendered = true;
-  list.replaceChildren();
-  const hours = [...liveHourly.keys()].sort((a, b) => a - b);
-  const summaries = hours.map(hour => ({ hour, ...hourlySummary(liveHourly.get(hour)) }));
+  hourList.hidden = false;
+  if (list) list.hidden = true;
+  hourList.replaceChildren();
+  const hours = buildHourSlots();
+  const summaries = hours.map((hour) => ({
+    hour,
+    label: HOUR_SLOTS[hour] || `${String(hour).padStart(2, '0')}:00-${String(hour).padStart(2, '0')}:59 น.`,
+    ...hourlySummary(liveHourly.get(hour) || liveHourly.get(String(hour)) || []),
+  }));
+  const maxRecipients = Math.max(1, ...summaries.map((item) => item.recipients));
   const maxService = summaries.reduce((best, item) => item.service > best.service ? item : best, summaries[0] || { hour: LIVE_HOUR, service: 0 });
   const maxDensityValue = summaries.reduce((best, item) => Math.max(best, item.density), 0);
-  const maxDensity = Math.max(1, maxDensityValue);
-  summaries.forEach(item => {
+  summaries.forEach((item) => {
     const el = document.createElement('div');
     el.className = 'st';
+    el.dataset.hour = String(item.hour);
     el.style.setProperty('--c', item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b');
     const highlights = [];
     if (item.density === maxDensityValue && maxDensityValue > 0) highlights.push('แออัดสูงสุด');
     if (item.service === maxService.service && maxService.service > 0) highlights.push('ใช้เวลามากสุด');
-    const tags = highlights.map(label => `<span class="tag highlight">${label}</span>`).join('');
-    el.innerHTML = `<div class="row"><div class="name">${String(item.hour).padStart(2, '0')}:00–${String(item.hour).padStart(2, '0')}:59${tags}</div>
-        <div class="rq"><b>${item.waiting}</b><small>ราย</small></div></div>
-      <div class="bar"><span style="width:${Math.min(100, item.density / maxDensity * 100)}%;background:${item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b'}"></span></div>
+    const tags = highlights.map((label) => `<span class="tag highlight">${label}</span>`).join('');
+    el.innerHTML = `<div class="row"><div class="name">${item.label}${tags}</div>
+        <div class="rq"><b>${item.recipients}</b><small>ราย</small></div></div>
+      <div class="bar"><span style="width:${Math.min(100, item.recipients / maxRecipients * 100)}%;background:${item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b'}"></span></div>
       <div class="mini"><div>รับบริการ <b>${item.served}</b></div><div>รับบริการเฉลี่ย <b>${item.service.toFixed(1)} น.</b></div><div>หนาแน่น <b>${item.density.toFixed(0)}%</b></div></div>`;
     el.style.cursor = 'pointer';
     el.addEventListener('click', () => {
@@ -581,36 +623,28 @@ function renderHourlyList() {
       selectedLiveTimer = setTimeout(() => {
         selectedLiveHour = null;
         seedLiveVisuals(LIVE_HOUR);
-        document.querySelectorAll('.st').forEach(card => card.classList.remove('selected'));
+        hourList.querySelectorAll('.st').forEach((card) => card.classList.remove('selected'));
       }, 300000);
       seedLiveVisuals(item.hour);
       document.getElementById('clock').textContent = `${String(item.hour).padStart(2, '0')}:00`;
-      document.getElementById('kIn').textContent = item.waiting;
+      document.getElementById('kIn').textContent = item.recipients;
       document.getElementById('kDone').textContent = item.service.toFixed(1);
       document.getElementById('kLos').textContent = item.density.toFixed(0) + '%';
-      document.querySelectorAll('.st').forEach(card => card.classList.remove('selected'));
+      hourList.querySelectorAll('.st').forEach((card) => card.classList.remove('selected'));
       el.classList.add('selected');
     });
-    list.appendChild(el);
+    hourList.appendChild(el);
   });
-  const location = document.createElement('div');
-  location.className = 'sub';
-  location.style.cssText = 'color:#7dd3fc;font-size:11px;padding:3px 2px 0;';
-  location.textContent = `ใช้เวลารับบริการมากสุด: ${String(maxService.hour).padStart(2, '0')}:00 · ${maxService.service.toFixed(1)} นาที/คน`;
-  location.remove();
 }
-STATIONS.forEach(st => {
-  const el = document.createElement('div'); el.className = 'st'; el.style.setProperty('--c', st.color);
-  el.innerHTML = `<div class="row"><div class="name">${st.name}<span class="tag">${KIND_TH[st.kind]}</span></div>
-      <div class="rq"><b>0</b><small>คน</small></div></div>
-    <div class="bar"><span></span></div>
-    <div class="mini"><div>บริการ <b class="m1">-</b></div><div>รอเฉลี่ย <b class="m2">-</b></div><div>เสร็จ <b class="m3">0</b></div></div>`;
-  list.appendChild(el);
-  st.ui = { q: el.querySelector('.rq b'), bar: el.querySelector('.bar span'),
-            m1: el.querySelector('.m1'), m2: el.querySelector('.m2'), m3: el.querySelector('.m3') };
+// เก็บ ui object ว่างไว้ให้โหมดจำลองไม่พัง แต่ไม่แสดงรายจุดบริการบนแผง
+STATIONS.forEach((st) => {
+  st.ui = { q: { textContent: '', style: {} }, bar: { style: {} }, m1: { textContent: '' }, m2: { textContent: '' }, m3: { textContent: '' } };
 });
+if (list) list.hidden = true;
+renderHourlyList();
 function updatePanel() {
   const t = 8 * 3600 + simTime * SIM_SCALE;
+  renderHourlyList();
   if (liveHourPending) {
     document.getElementById('clock').textContent = `${String(new Date().getHours()).padStart(2, '0')}:00`;
     document.getElementById('kIn').textContent = '-';
@@ -620,15 +654,16 @@ function updatePanel() {
   }
   const selectedRows = selectedLiveHour !== null ? liveHourly.get(selectedLiveHour) : null;
   const displayHour = selectedLiveHour !== null ? selectedLiveHour : LIVE_HOUR;
-  document.getElementById('clock').textContent = hasLiveData
+  document.getElementById('clock').textContent = (hasLiveData || liveHourly.size > 0)
     ? `${String(displayHour).padStart(2, '0')}:00`
     : `${String(Math.floor(t / 3600) % 24).padStart(2, '0')}:${String(Math.floor(t / 60) % 60).padStart(2, '0')}`;
-  renderHourlyList();
-  const currentSummary = hasLiveData ? hourlySummary(selectedRows || [...liveRows.values()]) : null;
-  document.getElementById('kIn').textContent = hasLiveData ? currentSummary.waiting : patients.length;
-  document.getElementById('kDone').textContent = hasLiveData ? currentSummary.service.toFixed(1) : (done ? simMin(losSum / done).toFixed(0) : '-');
-  document.getElementById('kLos').textContent = hasLiveData ? currentSummary.density.toFixed(0) + '%' : Math.min(100, Math.round((patients.length / 150) * 100)) + '%';
-  if (hasLiveData) return;
+  const currentSummary = (hasLiveData || liveHourly.size > 0)
+    ? hourlySummary(selectedRows || liveHourly.get(LIVE_HOUR) || [...liveRows.values()])
+    : null;
+  document.getElementById('kIn').textContent = currentSummary ? currentSummary.recipients : patients.length;
+  document.getElementById('kDone').textContent = currentSummary ? currentSummary.service.toFixed(1) : (done ? simMin(losSum / done).toFixed(0) : '-');
+  document.getElementById('kLos').textContent = currentSummary ? currentSummary.density.toFixed(0) + '%' : Math.min(100, Math.round((patients.length / 150) * 100)) + '%';
+  if (hasLiveData || liveHourly.size > 0) return;
   STATIONS.forEach(st => {
     const live = liveRows.get(st.id), n = live ? Number(live.waiting || 0) : st.queue.length, busy = st.servers.filter(s => s.p).length;
     st.ui.q.textContent = n;
@@ -740,6 +775,7 @@ function animate() {
     if (red !== p.red) { p.red = red; p.mesh.userData.headMat.color.set(red ? '#ef4444' : '#f2c9a0'); }
   }
   STATIONS.forEach(drawBadge);
+
   if ((panelAcc += dt) > 0.3) {
     panelAcc = 0; updatePanel();
     if (hovered) tip.innerHTML = buildTip(hovered.userData.info);   // อัปเดตข้อมูลสดขณะชี้เมาส์
