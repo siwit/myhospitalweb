@@ -239,21 +239,11 @@ try {
     wt_json_exit(500, ['ok' => false, 'error' => 'ingest_failed', 'message' => $e->getMessage()]);
 }
 
-// สรุป rush_hour หลัง ingest (best-effort ไม่ทำให้ sync ล้ม)
-$rushHour = null;
-try {
-    require_once dirname(__DIR__) . '/includes/waittime/RushHourAggregator.php';
-    $rushHour = RushHourAggregator::rebuild($conn, $dateFrom, $dateTo);
-} catch (Throwable $e) {
-    error_log('waittime_ingest rush_hour rebuild: ' . $e->getMessage());
-    $rushHour = ['error' => $e->getMessage()];
-}
-
+// twin / rush_hour ส่งแยกผ่าน api/rush_hour_ingest.php จาก waittime_api (ไม่ rebuild จาก anon ที่นี่)
 wt_json_exit(200, [
     'ok' => true,
     'date_from' => $dateFrom,
     'date_to' => $dateTo,
     'upserted' => $okCount,
     'synced_at' => $syncedAt,
-    'rush_hour' => $rushHour,
 ]);
