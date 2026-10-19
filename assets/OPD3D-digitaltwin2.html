@@ -25,7 +25,9 @@
   .kpis span{font-size:11px;color:#94a3b8;white-space:nowrap}
   .sec{font-size:12px;color:#94a3b8;font-weight:600;letter-spacing:.3px}
   #list,#hourList{display:flex;flex-direction:column;gap:16px}
-  .st{background:#111c33;border-radius:10px;padding:12px 12px;border-left:4px solid var(--c);margin:0}
+  .st{background:#111c33;border-radius:10px;padding:12px 12px;border-left:4px solid var(--c);margin:0;cursor:pointer;transition:box-shadow .15s,background .15s,border-color .15s}
+  .st:hover{background:#15233f}
+  .st.selected{background:#1e3a5f;box-shadow:inset 0 0 0 1px #38bdf8;border-left-color:#38bdf8}
   .row{display:flex;justify-content:space-between;align-items:center;gap:6px}
   .name{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;white-space:nowrap}
   .tag{font-size:10px;padding:1px 6px;border-radius:4px;background:#1e293b;color:#94a3b8;font-weight:400}
@@ -129,7 +131,8 @@ const SIM_DAY_END_H = 15;                  // คาบสุดท้าย 15:
 const SIM_DAY_WALL_SEC = (SIM_DAY_END_H - SIM_DAY_START_H) * 3600;
 const SIM_DAY_SIM_SEC = SIM_DAY_WALL_SEC / SIM_SCALE;
 const WALK = 55;                           // ความเร็วเดิน (px/วินาที)
-const SP = 13;                             // ระยะห่างคนในคิว (px)
+const SP = 18;                             // ระยะห่างคนในคิวจำลอง (px)
+const LIVE_SP = 24;                        // ระยะห่างคนในแถวจากข้อมูลจริง (px)
 const C_OPD = '#2563eb', C_NCD = '#f97316', C_STAFF = '#0d9488';
 const toW = (x, y, h = 0) => new THREE.Vector3((x - CX) / S, h, (y - CY) / S);
 /** ชั่วโมงบริการจากเวลาจริง รายคาบ: 06–15; หลัง 15:59 จนถึงก่อน 06:00 ค้างที่ 15 */
@@ -145,14 +148,15 @@ const LIVE_ZONE = { insurance:'reg', register:'reg', exam_opd:'examOPD', lab:'la
 const LIVE_DATE = window.__OPD_TWIN_DATE__ || null;
 const LIVE_ROWS = Array.isArray(window.__OPD_TWIN_ROWS__) ? window.__OPD_TWIN_ROWS__ : [];
 const LIVE_LATEST_HOUR = Number.isInteger(window.__OPD_TWIN_LATEST_HOUR__) ? window.__OPD_TWIN_LATEST_HOUR__ : null;
-const LIVE_HOUR = LIVE_LATEST_HOUR === null ? serviceHourFromReal() : LIVE_LATEST_HOUR;
-const liveRows = new Map(LIVE_ROWS.filter(row => Number(row.hour) === LIVE_HOUR && LIVE_ZONE[row.zone]).map(row => [LIVE_ZONE[row.zone], row]));
-const hasLiveData = liveRows.size > 0;
+// ชั่วโมงเริ่มต้นให้ตรงนาฬิกา (06–15) ไม่ใช้ max hour ใน DB ที่มักเป็น 15 เสมอ
+const LIVE_HOUR = serviceHourFromReal();
+let activeLiveHour = LIVE_HOUR;
+let liveRows = new Map();
+const hasLiveData = LIVE_ROWS.some(row => LIVE_ZONE[row.zone]);
 const localToday = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
 const liveHourPending = LIVE_DATE === localToday && LIVE_LATEST_HOUR !== null && LIVE_LATEST_HOUR < new Date().getHours();
 let selectedLiveHour = null;
 let selectedLiveTimer = null;
-const liveWaitingTotal = [...liveRows.values()].reduce((sum, row) => sum + Number(row.waiting || 0), 0);
 const liveHourly = new Map();
 LIVE_ROWS.forEach(row => {
   if (!LIVE_ZONE[row.zone]) return;
@@ -160,6 +164,54 @@ LIVE_ROWS.forEach(row => {
   if (!liveHourly.has(hour)) liveHourly.set(hour, []);
   liveHourly.get(hour).push(row);
 });
+/** ผูก liveRows + ป้ายหน้าห้อง + คนในคิว ให้ตามชั่วโมงที่เลือก/แสดง */
+function applyLiveHour(hour) {
+  activeLiveHour = Number(hour);
+  liveRows = new Map(
+    LIVE_ROWS
+      .filter(row => Number(row.hour) === activeLiveHour && LIVE_ZONE[row.zone])
+      .map(row => [LIVE_ZONE[row.zone], row])
+  );
+  if (typeof STATIONS !== 'undefined') {
+    STATIONS.forEach((st) => { st.sig = null; });
+    if (typeof seedLiveVisuals === 'function') seedLiveVisuals(activeLiveHour);
+    if (typeof drawBadge === 'function') STATIONS.forEach(drawBadge);
+  }
+  const listEl = document.getElementById('hourList');
+  if (listEl) {
+    listEl.querySelectorAll('.st').forEach((card) => {
+      const on = Number(card.dataset.hour) === activeLiveHour;
+      card.classList.toggle('selected', on);
+      card.style.setProperty('--c', on ? '#38bdf8' : '#64748b');
+    });
+  }
+}
+/** เลือกช่วงเวลาจาก progress → อัปเดตนาฬิกา KPI ป้าย และฉาก */
+function selectLiveHour(hour, lock = true) {
+  const h = Number(hour);
+  const rows = liveHourly.get(h) || liveHourly.get(String(h)) || [];
+  const summary = hourlySummary(rows);
+  if (lock) {
+    selectedLiveHour = h;
+    if (selectedLiveTimer) clearTimeout(selectedLiveTimer);
+    selectedLiveTimer = setTimeout(() => {
+      selectedLiveHour = null;
+      selectLiveHour(LIVE_HOUR, false);
+    }, 300000);
+  } else {
+    selectedLiveHour = null;
+  }
+  applyLiveHour(h);
+  const clockEl = document.getElementById('clock');
+  const kIn = document.getElementById('kIn');
+  const kDone = document.getElementById('kDone');
+  const kLos = document.getElementById('kLos');
+  if (clockEl) clockEl.textContent = lock ? `${String(h).padStart(2, '0')}:00` : serviceClockText();
+  if (kIn) kIn.textContent = summary.recipients;
+  if (kDone) kDone.textContent = summary.wait.toFixed(1);
+  if (kLos) kLos.textContent = summary.density.toFixed(0) + '%';
+}
+const liveWaitingTotal = () => [...liveRows.values()].reduce((sum, row) => sum + Number(row.waiting || 0), 0);
 
 /* ===== ย่อทั้งหน้าให้พอดีจอ (ไม่ให้แผงข้างโดนบีบ) ===== */
 const app = document.getElementById('app');
@@ -412,7 +464,13 @@ STATIONS.forEach(st => {
   sp.userData.info = { station: st.id }; sp.userData.base = sp.scale.clone(); hoverables.push(sp);
   st.badgeC = c; st.badgeTex = tex; st.badgeSp = sp;
 });
-const statusOf = n => n < 4 ? ['ปกติ', '#16a34a'] : n < 8 ? ['เริ่มหนาแน่น', '#d97706'] : ['แออัด', '#dc2626'];
+// สีป้ายตามจำนวนผู้ป่วยรอ: <30 เขียว, 30–39 ส้ม, >=40 แดง
+const badgeColorOf = n => n < 30
+  ? { fill: 'rgba(22,163,74,.92)', hex: '#16a34a', text: '#4ade80', bar: '#22c55e', label: 'ปกติ' }
+  : n < 40
+    ? { fill: 'rgba(217,119,6,.92)', hex: '#d97706', text: '#fbbf24', bar: '#f59e0b', label: 'เริ่มหนาแน่น' }
+    : { fill: 'rgba(220,38,38,.92)', hex: '#dc2626', text: '#f87171', bar: '#ef4444', label: 'แออัด' };
+const statusOf = n => { const c = badgeColorOf(n); return [c.label, c.hex]; };
 
 function drawBadge(st) {
   if (!st.badgeC || !st.badgeTex) return;
@@ -420,7 +478,7 @@ function drawBadge(st) {
   const sig = n + '|' + busy; if (sig === st.sig) return; st.sig = sig;
   const g = st.badgeC.getContext('2d');
   g.clearRect(0, 0, 384, 128);
-  g.fillStyle = n < 4 ? 'rgba(22,163,74,.92)' : n < 8 ? 'rgba(217,119,6,.92)' : 'rgba(220,38,38,.92)';
+  g.fillStyle = badgeColorOf(n).fill;
   g.beginPath(); g.roundRect(4, 4, 376, 120, 22); g.fill();
   g.fillStyle = '#fff'; g.textAlign = 'center';
   g.font = '600 46px Noto Sans Thai, Segoe UI'; g.fillText(st.name, 192, 46);
@@ -453,13 +511,14 @@ function route(from, to) {
   if (Math.hypot(to.x - from.x, to.y - from.y) < 45) return [{ ...to }];
   return [...graphPath(nearestNode(from), nearestNode(to)), { ...to }];
 }
-function slotPos(st, i) {
-  let d = i * SP; const pts = st.qPts;
+function slotPos(st, i, spacing = SP) {
+  let d = i * spacing; const pts = st.qPts;
   for (let k = 0; k < pts.length - 1; k++) {
     const a = pts[k], b = pts[k + 1], L = Math.hypot(b.x - a.x, b.y - a.y);
-    if (d <= L || k === pts.length - 2) { const t = d / L; return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; }
+    if (d <= L || k === pts.length - 2) { const t = L ? d / L : 0; return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; }
     d -= L;
   }
+  return pts.length ? { ...pts[pts.length - 1] } : { x: 0, y: 0 };
 }
 
 /* ================= SIMULATION ================= */
@@ -528,15 +587,15 @@ function seedLiveVisuals(hour = LIVE_HOUR) {
     const live = rowMap.get(st.id);
     const count = live ? Math.ceil(Number(live.waiting || 0) / 5) : 0;
     for (let i = 0; i < count; i++) {
-      const point = st.qPts[i % st.qPts.length];
+      const point = slotPos(st, i, LIVE_SP);
       const mesh = makePerson(st.id.includes('NCD') ? matNCD : matOPD);
-      mesh.position.copy(toW(point.x + (i % 2) * 4, point.y + Math.floor(i / 2) * 4));
+      mesh.position.copy(toW(point.x, point.y));
       scene.add(mesh);
       liveVisuals.push(mesh);
     }
   });
 }
-seedLiveVisuals();
+applyLiveHour(LIVE_HOUR);
 function stepMove(p, dt) {
   let rem = WALK * dt; const start = rem;
   while (rem > 0 && p.path.length) {
@@ -649,34 +708,19 @@ function renderHourlyList() {
   const maxDensityValue = summaries.reduce((best, item) => Math.max(best, item.density), 0);
   summaries.forEach((item) => {
     const el = document.createElement('div');
-    el.className = 'st';
+    el.className = 'st' + (item.hour === activeLiveHour ? ' selected' : '');
     el.dataset.hour = String(item.hour);
-    el.style.setProperty('--c', item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b');
+    el.style.setProperty('--c', item.hour === activeLiveHour ? '#38bdf8' : '#64748b');
     const highlights = [];
     if (item.density === maxDensityValue && maxDensityValue > 0) highlights.push('แออัดสูงสุด');
     if (item.wait === maxWait.wait && maxWait.wait > 0) highlights.push('รอนานสุด');
     const tags = highlights.map((label) => `<span class="tag highlight">${label}</span>`).join('');
+    const barColor = item.hour === activeLiveHour ? '#38bdf8' : '#64748b';
     el.innerHTML = `<div class="row"><div class="name">${item.label}${tags}</div>
         <div class="rq"><b>${item.recipients}</b><small>ราย</small></div></div>
-      <div class="bar"><span style="width:${Math.min(100, item.recipients / maxRecipients * 100)}%;background:${item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b'}"></span></div>
+      <div class="bar"><span style="width:${Math.min(100, item.recipients / maxRecipients * 100)}%;background:${barColor}"></span></div>
       <div class="mini"><div>รอเฉลี่ย <b>${item.wait.toFixed(1)} นาที/ราย</b></div><div>ความแออัด <b>${item.density.toFixed(0)}%</b></div></div>`;
-    el.style.cursor = 'pointer';
-    el.addEventListener('click', () => {
-      selectedLiveHour = item.hour;
-      if (selectedLiveTimer) clearTimeout(selectedLiveTimer);
-      selectedLiveTimer = setTimeout(() => {
-        selectedLiveHour = null;
-        seedLiveVisuals(LIVE_HOUR);
-        hourList.querySelectorAll('.st').forEach((card) => card.classList.remove('selected'));
-      }, 300000);
-      seedLiveVisuals(item.hour);
-      document.getElementById('clock').textContent = `${String(item.hour).padStart(2, '0')}:00`;
-      document.getElementById('kIn').textContent = item.recipients;
-      document.getElementById('kDone').textContent = item.wait.toFixed(1);
-      document.getElementById('kLos').textContent = item.density.toFixed(0) + '%';
-      hourList.querySelectorAll('.st').forEach((card) => card.classList.remove('selected'));
-      el.classList.add('selected');
-    });
+    el.addEventListener('click', () => selectLiveHour(item.hour, true));
     hourList.appendChild(el);
   });
 }
@@ -689,25 +733,19 @@ renderHourlyList();
 function updatePanel() {
   renderHourlyList();
   const realServiceHour = serviceHourFromReal();
-  if (liveHourPending) {
-    // นอกช่วงบริการ (เช่น หลัง 15:59) ค้างที่ 15:00; ในช่วง 06–15 แสดงต้นคาบของเวลาจริง
-    document.getElementById('clock').textContent = serviceClockText();
-    document.getElementById('kIn').textContent = '-';
-    document.getElementById('kDone').textContent = '-';
-    document.getElementById('kLos').textContent = '-';
-    return;
+  // ชั่วโมงที่กำลังแสดง: ถ้าคลิก progress ไว้ ใช้ค่านั้น; ไม่เช่นนั้นใช้ชั่วโมงตามนาฬิกา
+  const liveHourForKpi = selectedLiveHour !== null ? selectedLiveHour : realServiceHour;
+  if (selectedLiveHour === null && activeLiveHour !== liveHourForKpi && (hasLiveData || liveHourly.size > 0)) {
+    applyLiveHour(liveHourForKpi);
   }
-  const selectedRows = selectedLiveHour !== null ? liveHourly.get(selectedLiveHour) : null;
-  // ถ้าผู้ใช้เลือกชั่วโมงจากแผงข้าง → ตรึงนาฬิกาที่ชั่วโมงนั้น
-  // ไม่เช่นนั้นแสดงต้นคาบของเวลาจริง (15:50 → 15:00; หลัง 15:59 ค้าง 15:00 จนถึง 06:00)
   if (selectedLiveHour !== null) {
     document.getElementById('clock').textContent = `${String(selectedLiveHour).padStart(2, '0')}:00`;
   } else {
     document.getElementById('clock').textContent = serviceClockText();
   }
-  const liveHourForKpi = selectedLiveHour !== null ? selectedLiveHour : realServiceHour;
+  const selectedRows = liveHourly.get(liveHourForKpi) || liveHourly.get(String(liveHourForKpi)) || null;
   const currentSummary = (hasLiveData || liveHourly.size > 0)
-    ? hourlySummary(selectedRows || liveHourly.get(liveHourForKpi) || liveHourly.get(LIVE_HOUR) || [...liveRows.values()])
+    ? hourlySummary(selectedRows || liveHourly.get(LIVE_HOUR) || [...liveRows.values()])
     : null;
   document.getElementById('kIn').textContent = currentSummary ? currentSummary.recipients : patients.length;
   document.getElementById('kDone').textContent = currentSummary ? currentSummary.wait.toFixed(1) : (done ? simMin(losSum / done).toFixed(0) : '-');
@@ -715,10 +753,11 @@ function updatePanel() {
   if (hasLiveData || liveHourly.size > 0) return;
   STATIONS.forEach(st => {
     const live = liveRows.get(st.id), n = live ? Number(live.waiting || 0) : st.queue.length, busy = st.servers.filter(s => s.p).length;
+    const tone = badgeColorOf(n);
     st.ui.q.textContent = n;
-    st.ui.q.style.color = n < 4 ? '#4ade80' : n < 8 ? '#fbbf24' : '#f87171';
-    st.ui.bar.style.width = Math.min(100, n / 12 * 100) + '%';
-    st.ui.bar.style.background = n < 4 ? '#22c55e' : n < 8 ? '#f59e0b' : '#ef4444';
+    st.ui.q.style.color = tone.text;
+    st.ui.bar.style.width = Math.min(100, n / 50 * 100) + '%';
+    st.ui.bar.style.background = tone.bar;
     st.ui.m1.textContent = `${busy}/${st.servers.length}`;
     st.ui.m2.textContent = live ? live.avg_wait.toFixed(1) + ' น. · DB' : (st.waitN ? simMin(st.waitSum / st.waitN).toFixed(1) + ' น.' : '-');
     st.ui.m3.textContent = live ? live.served : st.served;

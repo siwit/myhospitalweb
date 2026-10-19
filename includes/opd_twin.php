@@ -46,11 +46,13 @@ function opd_twin_payload(PDO $conn, string $date): array
                 }
                 $waitingKey = "{$code}_waiting";
                 $avgKey = "{$code}_avg_minutes";
+                $svcKey = "{$code}_service_minutes";
                 if (!array_key_exists($waitingKey, $wide)) {
                     continue;
                 }
                 $waiting = max(0, (int) $wide[$waitingKey]);
                 $avg = isset($wide[$avgKey]) && $wide[$avgKey] !== null ? max(0, (float) $wide[$avgKey]) : 0.0;
+                $svc = isset($wide[$svcKey]) && $wide[$svcKey] !== null ? max(0, (float) $wide[$svcKey]) : 0.0;
                 $rows[] = [
                     'hour' => $hour,
                     'slot' => sprintf('%02d:00-%02d:59', $hour, $hour),
@@ -59,7 +61,7 @@ function opd_twin_payload(PDO $conn, string $date): array
                     'kind' => $zones[$code]['kind'],
                     'waiting' => $waiting,
                     'avg_wait' => $avg,
-                    'avg_service' => $avg,
+                    'avg_service' => $svc,
                     'served' => $waiting,
                     'capacity' => 4,
                 ];
