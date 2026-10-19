@@ -585,7 +585,7 @@ function seedLiveVisuals(hour = LIVE_HOUR) {
   const rowMap = new Map(rows.map(row => [LIVE_ZONE[row.zone], row]));
   STATIONS.forEach(st => {
     const live = rowMap.get(st.id);
-    const count = live ? Math.ceil(Number(live.waiting || 0) / 5) : 0;
+    const count = live ? Math.max(0, Math.round(Number(live.waiting || 0))) : 0; // อัตราส่วน avatar 1:1
     for (let i = 0; i < count; i++) {
       const point = slotPos(st, i, LIVE_SP);
       const mesh = makePerson(st.id.includes('NCD') ? matNCD : matOPD);
