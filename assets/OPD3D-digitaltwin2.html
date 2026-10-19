@@ -27,7 +27,7 @@
   #list,#hourList{display:flex;flex-direction:column;gap:16px}
   .st{background:#111c33;border-radius:10px;padding:12px 12px;border-left:4px solid var(--c);margin:0;cursor:pointer;transition:box-shadow .15s,background .15s,border-color .15s}
   .st:hover{background:#15233f}
-  .st.selected{background:#1e3a5f;box-shadow:inset 0 0 0 1px #38bdf8;border-left-color:#38bdf8}
+  .st.selected{background:#1e3a5f;box-shadow:inset 0 0 0 1px #38bdf8}
   .row{display:flex;justify-content:space-between;align-items:center;gap:6px}
   .name{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;white-space:nowrap}
   .tag{font-size:10px;padding:1px 6px;border-radius:4px;background:#1e293b;color:#94a3b8;font-weight:400}
@@ -91,7 +91,7 @@
       <button data-view="top">มุมบน</button>
       <button data-view="low">มุมต่ำ</button>
     </div>
-    <div id="legend">
+    <!-- <div id="legend">
       <span><i style="background:#2563eb"></i>ผู้ป่วย OPD</span>
       <span><i style="background:#f97316"></i>ผู้ป่วย NCD</span>
       <span><i style="background:#0d9488"></i>เจ้าหน้าที่</span>
@@ -99,7 +99,7 @@
       <span><i style="background:#22c55e;border-radius:2px"></i>ประตูห้องตรวจ</span>
       <span><i style="background:#7dd3fc;border-radius:2px"></i>ช่องเคาน์เตอร์</span>
       <span style="color:#7dd3fc">ชี้เมาส์ที่ป้ายชื่อห้องเพื่อดูรายละเอียด</span>
-    </div>
+    </div> -->
     <div id="tip"></div>
   </div>
   <div id="panel">
@@ -182,7 +182,8 @@ function applyLiveHour(hour) {
     listEl.querySelectorAll('.st').forEach((card) => {
       const on = Number(card.dataset.hour) === activeLiveHour;
       card.classList.toggle('selected', on);
-      card.style.setProperty('--c', on ? '#38bdf8' : '#64748b');
+      // ขอบซ้าย/แถบคงสีตามความแออัด ไม่เปลี่ยนเป็นฟ้าตอนเลือก
+      card.style.setProperty('--c', densityColorOf(card.dataset.density));
     });
   }
 }
@@ -431,13 +432,19 @@ const STATIONS = [
   { id:'triOPD',   name:'ซักประวัติ OPD', kind:'desk',    who:'OPD', color:'#6366f1', mean:9,   svc:[[222,167],[222,190],[222,213]], staff:[[254,167],[254,190],[254,213]],
     q:[[222,238],[222,262],[200,262],[200,215]], door:[], badge:[240,135] },
   { id:'examOPD',  name:'ห้องตรวจ OPD',   kind:'room',    who:'OPD', color:'#16a34a', mean:16,  svc:[[140,70],[180,70],[220,70]], staff:[[140,44],[180,44],[220,44]],
-    q:[[180,100],[180,190]], door:[[180,90],[180,74]], badge:[180,40] },
+    // คิวเลี้ยวกลับ (สลับเลน) หน้าห้องตรวจ OPD
+    q:[[180,100],[180,140],[210,140],[210,180],[180,180],[180,220],[210,220],[210,260],[180,260]],
+    door:[[180,90],[180,74]], badge:[180,40] },
   { id:'lab',      name:'เจาะเลือด LAB',  kind:'counter', who:'OPD (30%) + NCD (70%)', color:'#dc2626', mean:8, svc:[[348,97],[364,97]], staff:[[348,70],[364,70]],
-    q:[[332,108],[250,108],[250,135]], door:[], badge:[420,40] },
+    // คิวเลี้ยวไปโซนเก้าอี้หน้าห้องยา (อยู่ฝั่งนอก x < 372 ไม่ล้ำเข้าห้องยา)
+    q:[[348,108],[300,108],[288,130],[288,170],[318,170],[318,210],[288,210],[288,250],[318,250]],
+    door:[], badge:[420,40] },
   { id:'triNCD',   name:'ซักประวัติ NCD', kind:'desk',    who:'NCD', color:'#ca8a04', mean:8,   svc:[[550,166],[580,166]], staff:[[550,138],[580,138]],
     q:[[565,182],[565,232],[612,232],[612,190]], door:[], badge:[565,128] },
   { id:'examNCD',  name:'ห้องตรวจ NCD',   kind:'room',    who:'NCD', color:'#d97706', mean:8,   svc:[[640,68]], staff:[[640,42]],
-    q:[[630,100],[655,100],[655,245]], door:[[630,90],[630,74]], badge:[610,40] },
+    // คิวเลี้ยวกลับ ออกจากกำแพงด้านขวา มาอยู่กลางทางเดิน
+    q:[[620,100],[590,100],[590,145],[620,145],[620,190],[590,190],[590,235],[620,235],[620,270]],
+    door:[[630,90],[630,74]], badge:[610,40] },
   { id:'cashier',  name:'ห้องจ่ายเงิน',   kind:'counter', who:'OPD + NCD', color:'#db2777', mean:2.8, svc:[[360,248]], staff:[[386,248]],
     q:[[345,251],[320,251],[320,120]], door:[], badge:[432,250] },
   { id:'pharmOPD', name:'จ่ายยา OPD',    kind:'counter', who:'OPD', color:'#0891b2', mean:4.5, svc:[[360,164]], staff:[[386,164]],
@@ -453,7 +460,13 @@ STATIONS.forEach(st => {
   st.qPts = st.q.map(([x, y]) => ({ x, y }));
   st.door = st.door.map(([x, y]) => ({ x, y }));
   st.queue = []; st.waitSum = 0; st.waitN = 0; st.served = 0; st.busyTime = 0; st.sig = '';
-  st.staff.forEach(([x, y]) => { const s = makePerson(matStaff); s.position.copy(toW(x, y)); scene.add(s); });
+  st.staffMeshes = [];
+  st.staff.forEach(([x, y]) => {
+    const s = makePerson(matStaff);
+    s.position.copy(toW(x, y));
+    scene.add(s);
+    st.staffMeshes.push(s);
+  });
   // ไม่แสดงป้ายหน้าห้อง "ลงทะเบียน"
   if (st.id === 'reg') return;
   const c = document.createElement('canvas'); c.width = 384; c.height = 128;
@@ -579,21 +592,22 @@ function finishService(st, sv) {
 }
 const liveVisuals = [];
 function seedLiveVisuals(hour = LIVE_HOUR) {
-  liveVisuals.splice(0).forEach(mesh => { scene.remove(mesh); mesh.geometry?.dispose(); });
-  const rows = LIVE_ROWS.filter(row => Number(row.hour) === hour && LIVE_ZONE[row.zone]);
-  if (!rows.length) return;
-  const rowMap = new Map(rows.map(row => [LIVE_ZONE[row.zone], row]));
-  STATIONS.forEach(st => {
-    const live = rowMap.get(st.id);
-    const count = live ? Math.max(0, Math.round(Number(live.waiting || 0))) : 0; // อัตราส่วน avatar 1:1
-    for (let i = 0; i < count; i++) {
-      const point = slotPos(st, i, LIVE_SP);
-      const mesh = makePerson(st.id.includes('NCD') ? matNCD : matOPD);
-      mesh.position.copy(toW(point.x, point.y));
-      scene.add(mesh);
-      liveVisuals.push(mesh);
-    }
+  liveVisuals.splice(0).forEach(mesh => {
+    scene.remove(mesh);
+    mesh.geometry?.dispose();
+    mesh.userData?.headMat?.dispose?.();
   });
+  const rows = LIVE_ROWS.filter(row => Number(row.hour) === hour && LIVE_ZONE[row.zone]);
+  const rowMap = new Map(rows.map(row => [LIVE_ZONE[row.zone], row]));
+  const liveStationIds = new Set(Object.values(LIVE_ZONE));
+  // ซ่อน/แสดงผู้ให้บริการตามจำนวนผู้รอ (จุดใน rush_hour)
+  STATIONS.forEach(st => {
+    if (!liveStationIds.has(st.id)) return;
+    const live = rowMap.get(st.id);
+    const count = live ? Math.max(0, Math.round(Number(live.waiting || 0))) : 0;
+    (st.staffMeshes || []).forEach((mesh) => { mesh.visible = count > 0; });
+  });
+  // ไม่วาง avatar คงที่ทับคนเดิน — ให้ใช้ simulation เดินเหมือนเดิม
 }
 applyLiveHour(LIVE_HOUR);
 function stepMove(p, dt) {
@@ -675,6 +689,13 @@ function hourlySummary(rows) {
   const recipients = served > 0 ? served : waiting;
   return { waiting, capacity, served, recipients, density: capacity ? waiting / capacity * 100 : 0, service, wait };
 }
+/** สี progress ตามความแออัด: <40% เขียว, 40–70% ส้ม, >=70% แดง */
+function densityColorOf(density) {
+  const d = Number(density) || 0;
+  if (d < 40) return '#16a34a';
+  if (d < 70) return '#d97706';
+  return '#dc2626';
+}
 function buildHourSlots() {
   const nowH = new Date().getHours();
   const dataHours = [...liveHourly.keys()].map(Number).filter((h) => Number.isFinite(h));
@@ -710,16 +731,17 @@ function renderHourlyList() {
     const el = document.createElement('div');
     el.className = 'st' + (item.hour === activeLiveHour ? ' selected' : '');
     el.dataset.hour = String(item.hour);
-    el.style.setProperty('--c', item.hour === activeLiveHour ? '#38bdf8' : '#64748b');
+    el.dataset.density = String(item.density);
+    const tone = densityColorOf(item.density);
+    el.style.setProperty('--c', tone);
     const highlights = [];
     if (item.density === maxDensityValue && maxDensityValue > 0) highlights.push('แออัดสูงสุด');
     if (item.wait === maxWait.wait && maxWait.wait > 0) highlights.push('รอนานสุด');
     const tags = highlights.map((label) => `<span class="tag highlight">${label}</span>`).join('');
-    const barColor = item.hour === activeLiveHour ? '#38bdf8' : '#64748b';
     el.innerHTML = `<div class="row"><div class="name">${item.label}${tags}</div>
         <div class="rq"><b>${item.recipients}</b><small>ราย</small></div></div>
-      <div class="bar"><span style="width:${Math.min(100, item.recipients / maxRecipients * 100)}%;background:${barColor}"></span></div>
-      <div class="mini"><div>รอเฉลี่ย <b>${item.wait.toFixed(1)} นาที/ราย</b></div><div>ความแออัด <b>${item.density.toFixed(0)}%</b></div></div>`;
+      <div class="bar"><span style="width:${Math.min(100, item.recipients / maxRecipients * 100)}%;background:${tone}"></span></div>
+      <div class="mini"><div>รอเฉลี่ย <b>${item.wait.toFixed(1)} นาที/ราย</b></div><div>ความแออัด <b style="color:${tone}">${item.density.toFixed(0)}%</b></div></div>`;
     el.addEventListener('click', () => selectLiveHour(item.hour, true));
     hourList.appendChild(el);
   });
