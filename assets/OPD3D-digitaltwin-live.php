@@ -3,16 +3,44 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../includes/waittime/RushHourAggregator.php';
 
-$date = $_GET['twin_date'] ?? date('Y-m-d');
+$tz = new DateTimeZone('Asia/Bangkok');
+$todayBkk = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
+$date = $_GET['twin_date'] ?? $todayBkk;
 if (!is_string($date) || !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $parts)
     || !checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
-    $date = date('Y-m-d');
+    $date = $todayBkk;
 }
 $liveRows = [];
 $latestHour = null;
+
+/** รวม waiting ทั้งวันจากแถว twin long */
+$twinDayTotal = static function (array $rows): int {
+    $sum = 0;
+    foreach ($rows as $row) {
+        $sum += (int) ($row['waiting'] ?? 0);
+    }
+    return $sum;
+};
+
 try {
     RushHourAggregator::ensureTables($conn);
     $liveRows = RushHourAggregator::fetchTwinRows($conn, $date);
+
+    // วันนี้ยังไม่มี visit / แถวว่างทั้งวัน → ใช้วันล่าสุดที่มีข้อมูลจริง
+    if ($twinDayTotal($liveRows) === 0) {
+        $fallbackDate = $conn->query("
+            SELECT service_date
+            FROM rush_hour
+            WHERE total_recipients > 0
+            ORDER BY service_date DESC
+            LIMIT 1
+        ")->fetchColumn();
+        if (is_string($fallbackDate) && $fallbackDate !== '' && $fallbackDate !== $date) {
+            $date = $fallbackDate;
+            $liveRows = RushHourAggregator::fetchTwinRows($conn, $date);
+        }
+    }
+
     foreach ($liveRows as $row) {
         $latestHour = $latestHour === null ? (int) $row['hour'] : max($latestHour, (int) $row['hour']);
     }
@@ -43,5 +71,5 @@ $source = file_get_contents(__DIR__ . '/OPD3D-digitaltwin2.html');
 $injection = '<script>window.__OPD_TWIN_DATE__=' . json_encode($date, JSON_UNESCAPED_UNICODE)
     . ';window.__OPD_TWIN_LATEST_HOUR__=' . json_encode($latestHour)
     . ';window.__OPD_TWIN_ROWS__=' . json_encode($liveRows, JSON_UNESCAPED_UNICODE)
-    . ';window.__OPD_TWIN_UI_VER__="staff-white-v1";</script>';
+    . ';window.__OPD_TWIN_UI_VER__="lab-queue-reg-exit-v1";</script>';
 echo str_replace('</head>', $injection . '</head>', $source ?: '');
