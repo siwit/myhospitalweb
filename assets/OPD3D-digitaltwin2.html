@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPD Digital Twin 3D</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:'Noto Sans Thai','Segoe UI',sans-serif}
+  #app{flex:none;width:1600px;height:600px;display:flex;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);transform-origin:center center}
+  #view{flex:none;position:relative;width:1260px;height:600px}
+  #panel{flex:none;width:340px;height:600px;background:#0b1220;color:#e2e8f0;padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+  #panel>*{flex:none}
+  #panel::-webkit-scrollbar{width:6px}#panel::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+  .head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .title{font-size:19px;font-weight:700;color:#fff;white-space:nowrap}
+  .sub{font-size:12px;color:#94a3b8;white-space:nowrap}
+  .clockBox{text-align:right}
+  .clock{font-size:28px;font-weight:700;color:#38bdf8;line-height:1.1;letter-spacing:1px}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .kpis div{background:#111c33;border-radius:10px;padding:8px 4px;text-align:center}
+  .kpis b{display:block;font-size:22px;color:#fff;line-height:1.2}
+  .kpis span{font-size:11px;color:#94a3b8;white-space:nowrap}
+  .sec{font-size:12px;color:#94a3b8;font-weight:600;letter-spacing:.3px}
+  #list{display:flex;flex-direction:column;gap:6px}
+  .st{background:#111c33;border-radius:10px;padding:7px 10px 7px 10px;border-left:4px solid var(--c)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .name{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;white-space:nowrap}
+  .tag{font-size:10px;padding:1px 6px;border-radius:4px;background:#1e293b;color:#94a3b8;font-weight:400}
+  .tag.highlight{background:#7f1d1d;color:#fecaca;border:1px solid #ef4444}
+  .rq{white-space:nowrap}
+  .rq b{font-size:19px}
+  .rq small{font-size:11px;color:#94a3b8;margin-left:3px}
+  .bar{height:6px;background:#1e293b;border-radius:3px;overflow:hidden;margin:4px 0}
+  .bar span{display:block;height:100%;width:0;transition:width .3s,background .3s}
+  .mini{display:grid;grid-template-columns:repeat(3,1fr);font-size:11px;color:#94a3b8;white-space:nowrap}
+  .mini b{color:#e2e8f0;font-weight:600}
+  #toolbar{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:rgba(15,23,42,.82);padding:8px 10px;border-radius:10px;color:#e2e8f0;font-size:13px}
+  #toolbar button{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit;font-size:13px}
+  #toolbar button:hover{background:#334155}
+  #toolbar label{display:flex;align-items:center;gap:4px;margin-left:6px}
+  #toolbar input[type=range]{width:90px}
+  #legend{position:absolute;bottom:10px;left:10px;background:rgba(15,23,42,.82);color:#e2e8f0;font-size:12px;padding:6px 10px;border-radius:8px;display:flex;gap:12px;flex-wrap:wrap}
+  #legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+  #tip{position:absolute;pointer-events:none;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:12px;padding:10px 12px;border-radius:10px;display:none;width:300px;border:1px solid #334155;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:5;line-height:1.4}
+  .tt-h{display:flex;align-items:center;gap:6px;font-size:15px;color:#fff}
+  .tt-h i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .chip{margin-left:auto;font-size:11px;padding:1px 8px;border-radius:999px;color:#fff;font-weight:600;white-space:nowrap}
+  .tt-k{color:#94a3b8;font-size:11px;margin:2px 0 8px}
+  .tt-g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+  .tt-g div{background:#111c33;border-radius:8px;padding:5px 4px;text-align:center}
+  .tt-g b{display:block;font-size:16px;color:#fff}
+  .tt-g span{font-size:10px;color:#94a3b8;line-height:1.2;display:block}
+  .tt-u{font-size:11px;color:#94a3b8}
+  /* ขยายตัวอักษร Noto Sans Thai อีก 20% โดยคงขนาดผัง 3D เดิม */
+  .title{font-size:22.8px}
+  .sub{font-size:14.4px}
+  .clock{font-size:33.6px}
+  .kpis b{font-size:26.4px}
+  .kpis span,.rq small,.mini{font-size:13.2px}
+  .sec{font-size:14.4px}
+  .name{font-size:16.8px}
+  .tag{font-size:12px}
+  .rq b{font-size:22.8px}
+  #toolbar,#toolbar button{font-size:15.6px}
+  #legend,#tip{font-size:14.4px}
+  .tt-h{font-size:18px}
+  .chip{font-size:13.2px}
+  .tt-k{font-size:13.2px}
+  .tt-g b{font-size:19.2px}
+  .tt-g span,.tt-u{font-size:12px}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="view">
+    <div id="toolbar">
+      <button data-view="3d">มุม 3D</button>
+      <button data-view="top">มุมบน</button>
+      <button data-view="low">มุมต่ำ</button>
+    </div>
+    <div id="legend">
+      <span><i style="background:#2563eb"></i>ผู้ป่วย OPD</span>
+      <span><i style="background:#f97316"></i>ผู้ป่วย NCD</span>
+      <span><i style="background:#0d9488"></i>เจ้าหน้าที่</span>
+      <span><i style="background:#ef4444"></i>รอเกิน 15 นาที</span>
+      <span><i style="background:#22c55e;border-radius:2px"></i>ประตูห้องตรวจ</span>
+      <span><i style="background:#7dd3fc;border-radius:2px"></i>ช่องเคาน์เตอร์</span>
+      <span style="color:#7dd3fc">ชี้เมาส์ที่ป้ายชื่อห้องเพื่อดูรายละเอียด</span>
+    </div>
+    <div id="tip"></div>
+  </div>
+  <div id="panel">
+    <div class="head">
+      <div><div class="title">🏥 OPD Times</div><div class="sub">จำลองการรับบริการในแต่ละช่วงเวลา</div></div>
+      <div class="clockBox"><div class="clock" id="clock">08:00</div><div class="sub">เวลาจำลอง</div></div>
+    </div>
+    <div class="kpis">
+      <div><b id="kIn">0</b><span>ผู้รับบริการ</span></div>
+      <div><b id="kDone">-</b><span>เวลาเฉลี่ย นาที/ราย</span></div>
+<div><b id="kLos">0%</b><span>ความหนาแน่น %</span></div>
+    </div>
+    <div class="sec">ช่วงเวลารายชั่วโมง</div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ================= CONFIG ================= */
+const VIEW_W = 1260, VIEW_H = 600;
+const S = 10, CX = 363, CY = 157;          // 10 px ของแปลน = 1 หน่วย 3D
+const SIM_SCALE = 20;                      // 1 วินาทีจริง (1x) = 20 วินาทีจำลอง
+const WALK = 55;                           // ความเร็วเดิน (px/วินาที)
+const SP = 13;                             // ระยะห่างคนในคิว (px)
+const C_OPD = '#2563eb', C_NCD = '#f97316', C_STAFF = '#0d9488';
+const toW = (x, y, h = 0) => new THREE.Vector3((x - CX) / S, h, (y - CY) / S);
+const LIVE_ZONE = { insurance:'reg', register:'reg', exam_opd:'examOPD', lab:'lab', exam_ncd:'examNCD', history_opd:'triOPD', pharmacy_opd:'pharmOPD', pharmacy_ncd:'pharmNCD', history_ncd:'triNCD', cashier:'cashier' };
+const LIVE_DATE = window.__OPD_TWIN_DATE__ || null;
+const LIVE_ROWS = Array.isArray(window.__OPD_TWIN_ROWS__) ? window.__OPD_TWIN_ROWS__ : [];
+const LIVE_LATEST_HOUR = Number.isInteger(window.__OPD_TWIN_LATEST_HOUR__) ? window.__OPD_TWIN_LATEST_HOUR__ : null;
+const LIVE_HOUR = LIVE_LATEST_HOUR === null ? Number(new Date().getHours()) : LIVE_LATEST_HOUR;
+const liveRows = new Map(LIVE_ROWS.filter(row => Number(row.hour) === LIVE_HOUR && LIVE_ZONE[row.zone]).map(row => [LIVE_ZONE[row.zone], row]));
+const hasLiveData = liveRows.size > 0;
+const localToday = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+const liveHourPending = LIVE_DATE === localToday && LIVE_LATEST_HOUR !== null && LIVE_LATEST_HOUR < new Date().getHours();
+let selectedLiveHour = null;
+let selectedLiveTimer = null;
+const liveWaitingTotal = [...liveRows.values()].reduce((sum, row) => sum + Number(row.waiting || 0), 0);
+const liveHourly = new Map();
+LIVE_ROWS.forEach(row => {
+  if (!LIVE_ZONE[row.zone]) return;
+  const hour = Number(row.hour);
+  if (!liveHourly.has(hour)) liveHourly.set(hour, []);
+  liveHourly.get(hour).push(row);
+});
+
+/* ===== ย่อทั้งหน้าให้พอดีจอ (ไม่ให้แผงข้างโดนบีบ) ===== */
+const app = document.getElementById('app');
+function fit() { const s = Math.min(innerWidth / 1620, innerHeight / 620, 1); app.style.transform = `scale(${s})`; }
+addEventListener('resize', fit); fit();
+
+/* ================= SCENE ================= */
+const view = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(VIEW_W, VIEW_H);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+view.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#dfe7f1');
+const camera = new THREE.PerspectiveCamera(38, VIEW_W / VIEW_H, 0.1, 500);
+camera.position.set(0, 38, 36);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 1);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI / 2.15;
+controls.minDistance = 8; controls.maxDistance = 120;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.95));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(-20, 40, 25);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 25, bottom: -25, near: 1, far: 120 });
+scene.add(sun);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 120), new THREE.MeshStandardMaterial({ color: '#c9d3df' }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; ground.receiveShadow = true;
+scene.add(ground);
+
+/* ================= MATERIALS ================= */
+const wallMat    = new THREE.MeshStandardMaterial({ color: '#f8fafc', transparent: true, opacity: 0.92 });
+const edgeMat    = new THREE.LineBasicMaterial({ color: '#64748b' });
+const glassMat   = new THREE.MeshStandardMaterial({ color: '#7dd3fc', transparent: true, opacity: 0.35, roughness: 0.1, depthWrite: false });
+const counterMat = new THREE.MeshStandardMaterial({ color: '#b45309' });
+const doorMat    = new THREE.MeshStandardMaterial({ color: '#a16207' });
+const frameMat   = new THREE.MeshStandardMaterial({ color: '#475569' });
+
+/* ================= BUILDERS ================= */
+function floorRect(x1, y1, x2, y2, color, h = 0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry((x2 - x1) / S, 0.04, (y2 - y1) / S),
+    new THREE.MeshStandardMaterial({ color }));
+  m.position.copy(toW((x1 + x2) / 2, (y1 + y2) / 2, h));
+  m.receiveShadow = true; scene.add(m);
+}
+function seg(x1, y1, x2, y2, { h = 2.4, elev = 0, t = 0.22, mat = wallMat, edges = true, extend = true } = {}) {
+  const len = Math.hypot(x2 - x1, y2 - y1) / S;
+  const m = new THREE.Mesh(new THREE.BoxGeometry(len + (extend ? t : 0), h, t), mat);
+  m.position.copy(toW((x1 + x2) / 2, (y1 + y2) / 2, elev + h / 2));
+  m.rotation.y = -Math.atan2(y2 - y1, x2 - x1);
+  m.castShadow = true; m.receiveShadow = true;
+  if (edges) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), edgeMat));
+  scene.add(m); return m;
+}
+const wall = (x1, y1, x2, y2, h = 2.4) => seg(x1, y1, x2, y2, { h });
+function post(x, y, h = 2.4) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.26, h, 0.26), frameMat);
+  m.position.copy(toW(x, y, h / 2)); m.castShadow = true; scene.add(m);
+}
+// ช่องเคาน์เตอร์: ผนังเตี้ย + โต๊ะรับเรื่อง + กระจก + คานบน
+function counterWindow(x1, y1, x2, y2) {
+  seg(x1, y1, x2, y2, { h: 1.0, extend: false });
+  seg(x1, y1, x2, y2, { h: 0.08, elev: 1.0, t: 0.75, mat: counterMat, extend: false });
+  seg(x1, y1, x2, y2, { h: 1.0, elev: 1.08, t: 0.05, mat: glassMat, edges: false, extend: false });
+  seg(x1, y1, x2, y2, { h: 0.32, elev: 2.08, extend: false });
+  post(x1, y1); post(x2, y2);
+}
+// ประตูห้องตรวจ: วงกบ + คานบน + บานประตูเปิดเข้าห้อง + พรมหน้าประตู
+function door(x1, y1, x2, y2, swing = -1) {
+  seg(x1, y1, x2, y2, { h: 0.3, elev: 2.1, extend: false });
+  post(x1, y1); post(x2, y2);
+  const len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+  const nx = uy * swing, ny = ux * swing;
+  const hx = x1 + ux * 1.5, hy = y1 + uy * 1.5;
+  seg(hx, hy, hx + nx * (len - 3), hy + ny * (len - 3), { h: 2.0, t: 0.06, mat: doorMat, extend: false });
+  floorRect(Math.min(x1, x2), y1 + 1, Math.max(x1, x2), y1 + 15, '#86efac', 0.015);
+}
+// ทางเข้า-ออกอาคาร
+function entrance(x1, y1, x2, y2) {
+  seg(x1, y1, x2, y2, { h: 0.3, elev: 2.1, extend: false });
+  post(x1, y1); post(x2, y2);
+}
+
+const bodyGeo = new THREE.CapsuleGeometry(0.28, 0.5, 4, 10);
+const headGeo = new THREE.SphereGeometry(0.22, 14, 12);
+const matOPD = new THREE.MeshStandardMaterial({ color: C_OPD });
+const matNCD = new THREE.MeshStandardMaterial({ color: C_NCD });
+const matStaff = new THREE.MeshStandardMaterial({ color: C_STAFF });
+function makePerson(bodyMat) {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(bodyGeo, bodyMat); b.position.y = 0.6; b.castShadow = true;
+  const hm = new THREE.MeshStandardMaterial({ color: '#f2c9a0' });
+  const h = new THREE.Mesh(headGeo, hm); h.position.y = 1.25; h.castShadow = true;
+  g.add(b, h); g.userData.headMat = hm; return g;
+}
+function box(x, y, wpx, dpx, h, color, elev = 0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(wpx / S, h, dpx / S), new THREE.MeshStandardMaterial({ color }));
+  m.position.copy(toW(x, y, elev + h / 2));
+  m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
+}
+
+/* ป้ายชื่อห้อง (ชี้เมาส์ได้) */
+const hoverables = [];
+function floorLabel(text, x, y, w, color = '#334155', info = null) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  let fs = 92; g.font = `700 ${fs}px Noto Sans Thai, Segoe UI`;
+  while (g.measureText(text).width > 496 && fs > 29) { fs -= 4; g.font = `700 ${fs}px Noto Sans Thai, Segoe UI`; }
+  g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 66);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.copy(toW(x, y, 0.06)); scene.add(m);
+  if (info) { m.userData.info = info; m.userData.base = m.scale.clone(); hoverables.push(m); }
+  return m;
+}
+
+try { await document.fonts.load('700 40px Noto Sans Thai'); } catch (e) {}
+
+/* ================= FLOOR PLAN ================= */
+// พื้นที่ของแต่ละห้อง (ใช้ไฮไลต์ตอนชี้เมาส์)
+const ZONES = {
+  ins:[55,22,110,155], reg:[55,155,110,265], examOPD:[122,22,338,82], lab:[338,22,530,82], examNCD:[530,22,672,82],
+  pharmOPD:[372,88,438,230], pharmNCD:[438,88,492,230], cashier:[372,230,492,265],
+  triOPD:[212,150,265,230], triNCD:[530,128,600,175], OL:[15,265,55,292], OUT:[672,250,712,292]
+};
+floorRect(55, 22, 672, 292, '#f1f5f9', 0);
+floorRect(55, 22, 110, 155, '#ede9fe', 0.01);   // ประกันสุขภาพ
+floorRect(55, 155, 110, 265, '#e0f2fe', 0.01);  // ลงทะเบียน
+floorRect(122, 22, 338, 82, '#dcfce7', 0.01);   // ห้องตรวจ OPD
+floorRect(338, 22, 530, 82, '#fee2e2', 0.01);   // LAB
+floorRect(530, 22, 672, 82, '#fef3c7', 0.01);   // ห้องตรวจ NCD
+floorRect(372, 88, 438, 230, '#cffafe', 0.01);  // จ่ายยา OPD
+floorRect(438, 88, 492, 230, '#ffedd5', 0.01);  // จ่ายยา NCD
+floorRect(372, 230, 492, 265, '#fce7f3', 0.01); // จ่ายเงิน
+floorRect(212, 150, 265, 230, '#e0e7ff', 0.01); // ซักประวัติ OPD
+floorRect(530, 128, 600, 175, '#fef9c3', 0.01); // ซักประวัติ NCD
+floorRect(15, 265, 55, 292, '#94a3b8', 0.01);   // ลานหน้าทางเข้า (ซ้าย)
+floorRect(672, 250, 712, 292, '#94a3b8', 0.01); // ลานหน้าทางเข้า (ขวา)
+
+// ผนังภายนอก + ทางเข้า-ออก 2 ทาง
+wall(55, 22, 672, 22); wall(55, 292, 672, 292);
+wall(55, 22, 55, 265);  entrance(55, 265, 55, 292);
+wall(672, 22, 672, 250); entrance(672, 250, 672, 292);
+
+// ห้องประกันสุขภาพ / ห้องลงทะเบียน
+wall(110, 22, 110, 155);
+wall(55, 155, 110, 155);
+wall(110, 155, 110, 265);
+wall(55, 265, 70, 265); counterWindow(70, 265, 110, 265);
+
+// แถวห้องด้านบน
+wall(122, 22, 122, 82);
+wall(122, 82, 165, 82); door(165, 82, 195, 82); wall(195, 82, 338, 82);
+wall(338, 22, 338, 82);
+wall(338, 82, 342, 82); counterWindow(342, 82, 372, 82); wall(372, 82, 530, 82);
+wall(530, 22, 530, 82);
+wall(530, 82, 615, 82); door(615, 82, 645, 82); wall(645, 82, 672, 82);
+
+// กลุ่มห้องจ่ายยา / จ่ายเงิน
+wall(372, 88, 492, 88);
+wall(372, 88, 372, 150); counterWindow(372, 150, 372, 178);
+wall(372, 178, 372, 236); counterWindow(372, 236, 372, 260);
+wall(372, 260, 372, 265);
+wall(492, 88, 492, 150); counterWindow(492, 150, 492, 178);
+wall(492, 178, 492, 265);
+wall(372, 265, 492, 265); wall(438, 88, 438, 230); wall(372, 230, 492, 230);
+
+wall(275, 135, 275, 245, 1.3);   // กำแพงกลาง
+
+// เฟอร์นิเจอร์
+const WOOD = '#d6a46b';
+[140, 180, 220].forEach(x => box(x, 57, 24, 10, 0.75, WOOD));
+box(640, 55, 26, 10, 0.75, WOOD);
+[430, 490].forEach(x => box(x, 50, 26, 10, 0.9, '#e2e8f0'));
+box(238, 190, 10, 70, 0.75, WOOD);
+box(565, 151, 60, 10, 0.75, WOOD);
+box(405, 98, 50, 7, 2.0, '#94a3b8'); box(465, 98, 40, 7, 2.0, '#94a3b8');
+
+// เก้าอี้ (dir = ทิศของพนักพิง: S = ด้านล่าง, W = ด้านซ้าย)
+function chair(x, y, dir = 'S') {
+  box(x, y, 8, 8, 0.45, '#60a5fa');
+  if (dir === 'W') box(x - 4, y, 1.5, 8, 0.9, '#3b82f6');
+  else box(x, y + 4, 8, 1.5, 0.9, '#3b82f6');
+}
+for (const x of [120, 133]) for (let y = 165; y <= 237; y += 12) chair(x, y, 'W');  // ข้างผนังห้องลงทะเบียน
+for (let y = 145; y <= 235; y += 12) chair(287, y);
+for (let x = 540; x <= 590; x += 14) { chair(x, 244); chair(x, 257); }
+
+{ const s = makePerson(matStaff); s.position.copy(toW(82, 72)); scene.add(s); }   // จนท.ห้องประกัน
+
+// ป้ายชื่อห้อง
+floorLabel('ห้องประกันสุขภาพ', 82, 110, 5, '#334155', { room: 'ins' });
+floorLabel('ห้องลงทะเบียน', 82, 175, 5, '#334155', { station: 'reg' });
+floorLabel('ห้องตรวจ OPD', 285, 50, 8, '#166534', { station: 'examOPD' });
+floorLabel('ห้องเจาะเลือด LAB', 470, 72, 6, '#991b1b', { station: 'lab' });
+floorLabel('ห้องตรวจ NCD', 590, 30, 7, '#92400e', { station: 'examNCD' });
+floorLabel('ห้องจ่ายยา OPD', 405, 200, 6, '#334155', { station: 'pharmOPD' });
+floorLabel('ห้องจ่ายยา NCD', 465, 200, 5, '#334155', { station: 'pharmNCD' });
+floorLabel('ห้องจ่ายเงิน', 432, 250, 6, '#334155', { station: 'cashier' });
+floorLabel('จุดซักประวัติ OPD', 240, 140, 5.5, '#334155', { station: 'triOPD' });
+floorLabel('จุดซักประวัติ NCD', 565, 118, 6, '#334155', { station: 'triNCD' });
+floorLabel('ทางเข้า-ออก', 33, 255, 5, '#0f172a', { exit: 'OL' });
+floorLabel('ทางเข้า-ออก', 692, 240, 5, '#0f172a', { exit: 'OUT' });
+
+/* ================= STATIONS ================= */
+const STATIONS = [
+  { id:'reg',      name:'ลงทะเบียน',     kind:'counter', who:'OPD + NCD', color:'#0ea5e9', mean:6,   svc:[[80,277],[100,277]], staff:[[80,250],[100,250]],
+    q:[[126,276],[150,256],[150,110]], door:[], badge:[82,215] },
+  { id:'triOPD',   name:'ซักประวัติ OPD', kind:'desk',    who:'OPD', color:'#6366f1', mean:9,   svc:[[222,167],[222,190],[222,213]], staff:[[254,167],[254,190],[254,213]],
+    q:[[222,238],[222,262],[200,262],[200,215]], door:[], badge:[240,135] },
+  { id:'examOPD',  name:'ห้องตรวจ OPD',   kind:'room',    who:'OPD', color:'#16a34a', mean:16,  svc:[[140,70],[180,70],[220,70]], staff:[[140,44],[180,44],[220,44]],
+    q:[[180,100],[180,190]], door:[[180,90],[180,74]], badge:[180,40] },
+  { id:'lab',      name:'เจาะเลือด LAB',  kind:'counter', who:'OPD (30%) + NCD (70%)', color:'#dc2626', mean:8, svc:[[348,97],[364,97]], staff:[[348,70],[364,70]],
+    q:[[332,108],[250,108],[250,135]], door:[], badge:[420,40] },
+  { id:'triNCD',   name:'ซักประวัติ NCD', kind:'desk',    who:'NCD', color:'#ca8a04', mean:8,   svc:[[550,166],[580,166]], staff:[[550,138],[580,138]],
+    q:[[565,182],[565,232],[612,232],[612,190]], door:[], badge:[565,128] },
+  { id:'examNCD',  name:'ห้องตรวจ NCD',   kind:'room',    who:'NCD', color:'#d97706', mean:8,   svc:[[640,68]], staff:[[640,42]],
+    q:[[630,100],[655,100],[655,245]], door:[[630,90],[630,74]], badge:[610,40] },
+  { id:'cashier',  name:'ห้องจ่ายเงิน',   kind:'counter', who:'OPD + NCD', color:'#db2777', mean:2.8, svc:[[360,248]], staff:[[386,248]],
+    q:[[345,251],[320,251],[320,120]], door:[], badge:[432,250] },
+  { id:'pharmOPD', name:'จ่ายยา OPD',    kind:'counter', who:'OPD', color:'#0891b2', mean:4.5, svc:[[360,164]], staff:[[386,164]],
+    q:[[358,180],[358,215],[335,215],[335,120]], door:[], badge:[405,140] },
+  { id:'pharmNCD', name:'จ่ายยา NCD',    kind:'counter', who:'NCD', color:'#ea580c', mean:6,   svc:[[505,164]], staff:[[478,164]],
+    q:[[505,180],[505,225],[522,225],[522,110]], door:[], badge:[465,140] },
+];
+const KIND_TH = { room: 'เข้าห้อง', counter: 'หน้าเคาน์เตอร์', desk: 'หน้าโต๊ะ' };
+const ST = {};
+STATIONS.forEach(st => {
+  ST[st.id] = st;
+  st.servers = st.svc.map(([x, y]) => ({ pos: { x, y }, p: null, t: 0 }));
+  st.qPts = st.q.map(([x, y]) => ({ x, y }));
+  st.door = st.door.map(([x, y]) => ({ x, y }));
+  st.queue = []; st.waitSum = 0; st.waitN = 0; st.served = 0; st.busyTime = 0; st.sig = '';
+  st.staff.forEach(([x, y]) => { const s = makePerson(matStaff); s.position.copy(toW(x, y)); scene.add(s); });
+  const c = document.createElement('canvas'); c.width = 384; c.height = 128;
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  sp.scale.set(5.4, 1.8, 1); sp.renderOrder = 10;
+  sp.position.copy(toW(st.badge[0], st.badge[1], 4.2)); scene.add(sp);
+  sp.userData.info = { station: st.id }; sp.userData.base = sp.scale.clone(); hoverables.push(sp);
+  st.badgeC = c; st.badgeTex = tex;
+});
+const statusOf = n => n < 4 ? ['ปกติ', '#16a34a'] : n < 8 ? ['เริ่มหนาแน่น', '#d97706'] : ['แออัด', '#dc2626'];
+
+function drawBadge(st) {
+  const live = liveRows.get(st.id), n = live ? Number(live.waiting || 0) : st.queue.length, busy = st.servers.filter(s => s.p).length;
+  const sig = n + '|' + busy; if (sig === st.sig) return; st.sig = sig;
+  const g = st.badgeC.getContext('2d');
+  g.clearRect(0, 0, 384, 128);
+  g.fillStyle = n < 4 ? 'rgba(22,163,74,.92)' : n < 8 ? 'rgba(217,119,6,.92)' : 'rgba(220,38,38,.92)';
+  g.beginPath(); g.roundRect(4, 4, 376, 120, 22); g.fill();
+  g.fillStyle = '#fff'; g.textAlign = 'center';
+  g.font = '600 46px Noto Sans Thai, Segoe UI'; g.fillText(st.name, 192, 46);
+  g.font = '700 60px Noto Sans Thai, Segoe UI'; g.fillText(`รอ ${n} คน · ${busy}/${st.servers.length}`, 192, 100);
+  st.badgeTex.needsUpdate = true;
+}
+
+/* ================= PATH GRAPH ================= */
+const NODES = {
+  OL:[30,278], RG:[112,278],
+  OUT:[705,275], E1:[645,278], B2:[515,278], B1:[310,278], BL:[165,278],
+  L1:[165,200], L2:[165,95], MT:[300,95], MM:[310,200], RM:[515,205], RT:[515,98], R2:[600,98]
+};
+const EXITS = ['OL', 'OUT'];
+const EXIT_INFO = { OL: { name: 'ทางเข้า-ออก (ฝั่งห้องบัตร)', in: 0, out: 0 }, OUT: { name: 'ทางเข้า-ออก (ฝั่ง NCD)', in: 0, out: 0 } };
+const EDGES = [['OL','RG'],['RG','BL'],
+               ['OUT','E1'],['E1','B2'],['B2','B1'],['B1','BL'],['BL','L1'],['L1','L2'],['L2','MT'],
+               ['MT','MM'],['MM','B1'],['B2','RM'],['RM','RT'],['RT','R2']];
+const ADJ = {}; Object.keys(NODES).forEach(k => ADJ[k] = []);
+EDGES.forEach(([a, b]) => { ADJ[a].push(b); ADJ[b].push(a); });
+const dist = (a, b) => Math.hypot(a[0] - b.x, a[1] - b.y);
+const nearestNode = p => Object.keys(NODES).reduce((best, k) => dist(NODES[k], p) < dist(NODES[best], p) ? k : best);
+function graphPath(a, b) {
+  const prev = { [a]: null }, q = [a];
+  while (q.length) { const n = q.shift(); if (n === b) break; for (const m of ADJ[n]) if (!(m in prev)) { prev[m] = n; q.push(m); } }
+  const path = []; for (let c = b; c != null; c = prev[c]) path.unshift(c);
+  return path.map(k => ({ x: NODES[k][0], y: NODES[k][1] }));
+}
+function route(from, to) {
+  if (Math.hypot(to.x - from.x, to.y - from.y) < 45) return [{ ...to }];
+  return [...graphPath(nearestNode(from), nearestNode(to)), { ...to }];
+}
+function slotPos(st, i) {
+  let d = i * SP; const pts = st.qPts;
+  for (let k = 0; k < pts.length - 1; k++) {
+    const a = pts[k], b = pts[k + 1], L = Math.hypot(b.x - a.x, b.y - a.y);
+    if (d <= L || k === pts.length - 2) { const t = d / L; return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; }
+    d -= L;
+  }
+}
+
+/* ================= SIMULATION ================= */
+let simTime = 0, done = 0, losSum = 0, spawnAcc = 0, nextSpawn = 0, pid = 0;
+let running = true, speed = 1.5, arrInterval = 4;
+const patients = [];
+
+function makeRoute(type) {
+  const lab = Math.random() < (type === 'NCD' ? 0.7 : 0.3);
+  return type === 'OPD'
+    ? ['reg', 'triOPD', 'examOPD', ...(lab ? ['lab'] : []), 'cashier', 'pharmOPD']
+    : ['reg', ...(lab ? ['lab'] : []), 'triNCD', 'examNCD', 'cashier', 'pharmNCD'];
+}
+function spawn() {
+  const type = Math.random() < 0.6 ? 'OPD' : 'NCD';
+  const entKey = EXITS[Math.random() < 0.5 ? 0 : 1], ent = NODES[entKey];
+  EXIT_INFO[entKey].in++;
+  const p = { id: ++pid, type, route: makeRoute(type), step: 0, pos: { x: ent[0], y: ent[1] }, path: [],
+              state: 'walking', t0: simTime, mesh: makePerson(type === 'OPD' ? matOPD : matNCD), red: false };
+  p.mesh.position.copy(toW(p.pos.x, p.pos.y)); scene.add(p.mesh);
+  patients.push(p); joinStation(p, ST[p.route[0]], []);
+}
+function joinStation(p, st, prefix) {
+  st.queue.push(p); p.station = st; p.state = 'walking'; p.qStart = simTime;
+  const from = prefix.length ? prefix[prefix.length - 1] : p.pos;
+  p.path = [...prefix, ...route(from, slotPos(st, st.queue.length - 1))];
+}
+function finishService(st, sv) {
+  const p = sv.p; sv.p = null; st.served++; p.step++;
+  const exitPts = [...st.door].reverse().map(d => ({ ...d }));
+  if (p.step < p.route.length) joinStation(p, ST[p.route[p.step]], exitPts);
+  else {
+    p.state = 'leaving'; p.station = null;
+    const from = exitPts.length ? exitPts[exitPts.length - 1] : p.pos;
+    p.exitKey = EXITS.reduce((a, b) => dist(NODES[a], from) < dist(NODES[b], from) ? a : b);
+    const ex = NODES[p.exitKey];
+    p.path = [...exitPts, ...route(from, { x: ex[0], y: ex[1] })];
+  }
+}
+const liveVisuals = [];
+function seedLiveVisuals(hour = LIVE_HOUR) {
+  liveVisuals.splice(0).forEach(mesh => { scene.remove(mesh); mesh.geometry?.dispose(); });
+  const rows = LIVE_ROWS.filter(row => Number(row.hour) === hour && LIVE_ZONE[row.zone]);
+  if (!rows.length) return;
+  const rowMap = new Map(rows.map(row => [LIVE_ZONE[row.zone], row]));
+  STATIONS.forEach(st => {
+    const live = rowMap.get(st.id);
+    const count = live ? Math.ceil(Number(live.waiting || 0) / 5) : 0;
+    for (let i = 0; i < count; i++) {
+      const point = st.qPts[i % st.qPts.length];
+      const mesh = makePerson(st.id.includes('NCD') ? matNCD : matOPD);
+      mesh.position.copy(toW(point.x + (i % 2) * 4, point.y + Math.floor(i / 2) * 4));
+      scene.add(mesh);
+      liveVisuals.push(mesh);
+    }
+  });
+}
+seedLiveVisuals();
+function stepMove(p, dt) {
+  let rem = WALK * dt; const start = rem;
+  while (rem > 0 && p.path.length) {
+    const t = p.path[0], dx = t.x - p.pos.x, dy = t.y - p.pos.y, d = Math.hypot(dx, dy);
+    if (d <= rem) { p.pos.x = t.x; p.pos.y = t.y; p.path.shift(); rem -= d; }
+    else { p.pos.x += dx / d * rem; p.pos.y += dy / d * rem; rem = 0; }
+  }
+  p.moving = rem < start - 0.01;
+  return p.path.length === 0;
+}
+function simStep(dt) {
+  simTime += dt;
+  spawnAcc += dt;
+  if (spawnAcc >= nextSpawn) { spawnAcc = 0; nextSpawn = arrInterval * (0.5 + Math.random()); if (patients.length < 160) spawn(); }
+
+  for (const st of STATIONS) {
+    for (const sv of st.servers) {
+      if (!sv.p && st.queue.length && st.queue[0].state === 'queued') {
+        const p = st.queue.shift(); sv.p = p; p.sv = sv; p.state = 'toService';
+        st.waitSum += simTime - p.qStart; st.waitN++;
+        p.path = [...st.door.map(d => ({ ...d })), { ...sv.pos }];
+      }
+      if (sv.p && sv.p.state === 'inService' && (sv.t -= dt) <= 0) finishService(st, sv);
+    }
+    st.busyTime += st.servers.filter(s => s.p).length * dt;
+  }
+
+  for (let i = patients.length - 1; i >= 0; i--) {
+    const p = patients[i]; p.moving = false;
+    switch (p.state) {
+      case 'walking': if (stepMove(p, dt)) p.state = 'queued'; break;
+      case 'queued': p.path = [slotPos(p.station, p.station.queue.indexOf(p))]; stepMove(p, dt * 0.8); break;
+      case 'toService': if (stepMove(p, dt)) { p.state = 'inService'; p.sv.t = p.station.mean * (0.5 + Math.random()); } break;
+      case 'leaving':
+        if (stepMove(p, dt)) {
+          scene.remove(p.mesh); p.mesh.userData.headMat.dispose();
+          patients.splice(i, 1); done++; losSum += simTime - p.t0; EXIT_INFO[p.exitKey].out++;
+        }
+        break;
+    }
+  }
+}
+const simMin = s => s * SIM_SCALE / 60;
+
+/* ================= PANEL ================= */
+const list = document.getElementById('list');
+let hourlyListRendered = false;
+function hourlySummary(rows) {
+  const waiting = rows.reduce((sum, row) => sum + Number(row.waiting || 0), 0);
+  const capacity = rows.reduce((sum, row) => sum + Number(row.capacity || 0), 0);
+  const served = rows.reduce((sum, row) => sum + Number(row.served || 0), 0);
+  const service = served ? rows.reduce((sum, row) => sum + Number(row.avg_service || 0) * Number(row.served || 0), 0) / served : 0;
+  return { waiting, capacity, served, density: capacity ? waiting / capacity * 100 : 0, service };
+}
+function renderHourlyList() {
+  if (!hasLiveData || hourlyListRendered) return;
+  hourlyListRendered = true;
+  list.replaceChildren();
+  const hours = [...liveHourly.keys()].sort((a, b) => a - b);
+  const summaries = hours.map(hour => ({ hour, ...hourlySummary(liveHourly.get(hour)) }));
+  const maxService = summaries.reduce((best, item) => item.service > best.service ? item : best, summaries[0] || { hour: LIVE_HOUR, service: 0 });
+  const maxDensityValue = summaries.reduce((best, item) => Math.max(best, item.density), 0);
+  const maxDensity = Math.max(1, maxDensityValue);
+  summaries.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'st';
+    el.style.setProperty('--c', item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b');
+    const highlights = [];
+    if (item.density === maxDensityValue && maxDensityValue > 0) highlights.push('แออัดสูงสุด');
+    if (item.service === maxService.service && maxService.service > 0) highlights.push('ใช้เวลามากสุด');
+    const tags = highlights.map(label => `<span class="tag highlight">${label}</span>`).join('');
+    el.innerHTML = `<div class="row"><div class="name">${String(item.hour).padStart(2, '0')}:00–${String(item.hour).padStart(2, '0')}:59${tags}</div>
+        <div class="rq"><b>${item.waiting}</b><small>ราย</small></div></div>
+      <div class="bar"><span style="width:${Math.min(100, item.density / maxDensity * 100)}%;background:${item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b'}"></span></div>
+      <div class="mini"><div>รับบริการ <b>${item.served}</b></div><div>รับบริการเฉลี่ย <b>${item.service.toFixed(1)} น.</b></div><div>หนาแน่น <b>${item.density.toFixed(0)}%</b></div></div>`;
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => {
+      selectedLiveHour = item.hour;
+      if (selectedLiveTimer) clearTimeout(selectedLiveTimer);
+      selectedLiveTimer = setTimeout(() => {
+        selectedLiveHour = null;
+        seedLiveVisuals(LIVE_HOUR);
+        document.querySelectorAll('.st').forEach(card => card.classList.remove('selected'));
+      }, 300000);
+      seedLiveVisuals(item.hour);
+      document.getElementById('clock').textContent = `${String(item.hour).padStart(2, '0')}:00`;
+      document.getElementById('kIn').textContent = item.waiting;
+      document.getElementById('kDone').textContent = item.service.toFixed(1);
+      document.getElementById('kLos').textContent = item.density.toFixed(0) + '%';
+      document.querySelectorAll('.st').forEach(card => card.classList.remove('selected'));
+      el.classList.add('selected');
+    });
+    list.appendChild(el);
+  });
+  const location = document.createElement('div');
+  location.className = 'sub';
+  location.style.cssText = 'color:#7dd3fc;font-size:11px;padding:3px 2px 0;';
+  location.textContent = `ใช้เวลารับบริการมากสุด: ${String(maxService.hour).padStart(2, '0')}:00 · ${maxService.service.toFixed(1)} นาที/คน`;
+  location.remove();
+}
+STATIONS.forEach(st => {
+  const el = document.createElement('div'); el.className = 'st'; el.style.setProperty('--c', st.color);
+  el.innerHTML = `<div class="row"><div class="name">${st.name}<span class="tag">${KIND_TH[st.kind]}</span></div>
+      <div class="rq"><b>0</b><small>คน</small></div></div>
+    <div class="bar"><span></span></div>
+    <div class="mini"><div>บริการ <b class="m1">-</b></div><div>รอเฉลี่ย <b class="m2">-</b></div><div>เสร็จ <b class="m3">0</b></div></div>`;
+  list.appendChild(el);
+  st.ui = { q: el.querySelector('.rq b'), bar: el.querySelector('.bar span'),
+            m1: el.querySelector('.m1'), m2: el.querySelector('.m2'), m3: el.querySelector('.m3') };
+});
+function updatePanel() {
+  const t = 8 * 3600 + simTime * SIM_SCALE;
+  if (liveHourPending) {
+    document.getElementById('clock').textContent = `${String(new Date().getHours()).padStart(2, '0')}:00`;
+    document.getElementById('kIn').textContent = '-';
+    document.getElementById('kDone').textContent = '-';
+    document.getElementById('kLos').textContent = '-';
+    return;
+  }
+  const selectedRows = selectedLiveHour !== null ? liveHourly.get(selectedLiveHour) : null;
+  const displayHour = selectedLiveHour !== null ? selectedLiveHour : LIVE_HOUR;
+  document.getElementById('clock').textContent = hasLiveData
+    ? `${String(displayHour).padStart(2, '0')}:00`
+    : `${String(Math.floor(t / 3600) % 24).padStart(2, '0')}:${String(Math.floor(t / 60) % 60).padStart(2, '0')}`;
+  renderHourlyList();
+  const currentSummary = hasLiveData ? hourlySummary(selectedRows || [...liveRows.values()]) : null;
+  document.getElementById('kIn').textContent = hasLiveData ? currentSummary.waiting : patients.length;
+  document.getElementById('kDone').textContent = hasLiveData ? currentSummary.service.toFixed(1) : (done ? simMin(losSum / done).toFixed(0) : '-');
+  document.getElementById('kLos').textContent = hasLiveData ? currentSummary.density.toFixed(0) + '%' : Math.min(100, Math.round((patients.length / 150) * 100)) + '%';
+  if (hasLiveData) return;
+  STATIONS.forEach(st => {
+    const live = liveRows.get(st.id), n = live ? Number(live.waiting || 0) : st.queue.length, busy = st.servers.filter(s => s.p).length;
+    st.ui.q.textContent = n;
+    st.ui.q.style.color = n < 4 ? '#4ade80' : n < 8 ? '#fbbf24' : '#f87171';
+    st.ui.bar.style.width = Math.min(100, n / 12 * 100) + '%';
+    st.ui.bar.style.background = n < 4 ? '#22c55e' : n < 8 ? '#f59e0b' : '#ef4444';
+    st.ui.m1.textContent = `${busy}/${st.servers.length}`;
+    st.ui.m2.textContent = live ? live.avg_wait.toFixed(1) + ' น. · DB' : (st.waitN ? simMin(st.waitSum / st.waitN).toFixed(1) + ' น.' : '-');
+    st.ui.m3.textContent = live ? live.served : st.served;
+  });
+}
+
+/* ================= TOOLTIP (ป้ายชื่อห้อง) ================= */
+function stationTip(st) {
+  const live = liveRows.get(st.id);
+  const n = live ? Number(live.waiting || 0) : st.queue.length;
+  const avgW = live ? Number(live.avg_wait || 0).toFixed(1) : (st.waitN ? simMin(st.waitSum / st.waitN).toFixed(1) : '-');
+  const serviceMean = live ? Number(live.avg_service || 0) : simMin(st.mean);
+  const [stTxt, stCol] = statusOf(n);
+  return `<div class="tt-h"><i style="background:${st.color}"></i><b>${st.name}</b><span class="chip" style="background:${stCol}">${stTxt}</span></div>
+    <div class="tt-g" style="margin-bottom:0">
+      <div><b>${n}</b><span>จำนวนผู้รอคิว<br>(ราย)</span></div>
+      <div><b>${avgW}</b><span>วลารอเฉลี่ย<br>(นาที/ราย)</span></div>
+      <div><b>${serviceMean.toFixed(1)}</b><span>เวลารับบริการเฉลี่ย<br>(นาที/ราย)</span></div>
+    </div>`;
+}
+function buildTip(info) {
+  if (info.station) return stationTip(ST[info.station]);
+  if (info.exit) {
+    const e = EXIT_INFO[info.exit];
+    const going = patients.filter(p => p.state === 'leaving' && p.exitKey === info.exit).length;
+    return `<div class="tt-h"><i style="background:#64748b"></i><b>${e.name}</b></div>
+      <div class="tt-k">ทางเข้า-ออกหลักของอาคาร ผู้ป่วยกลับออกทางที่ใกล้จุดสุดท้ายมากกว่า</div>
+      <div class="tt-g" style="margin-bottom:0">
+        <div><b>${e.in}</b><span>เข้ามา<br>แล้ว (คน)</span></div>
+        <div><b>${e.out}</b><span>ออกไป<br>แล้ว (คน)</span></div>
+        <div><b>${going}</b><span>กำลัง<br>เดินออก</span></div>
+      </div>`;
+  }
+  return `<div class="tt-h"><i style="background:#8b5cf6"></i><b>ห้องประกันสุขภาพ</b></div>
+    <div class="tt-k" style="margin-bottom:0">ห้องปิด ผนังทึบ ไม่มีช่องเคาน์เตอร์ · เจ้าหน้าที่ 1 คน<br>ยังไม่รวมอยู่ในเส้นทางคิวของการจำลอง</div>`;
+}
+
+const hl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ color: '#38bdf8', transparent: true, opacity: 0.3, depthWrite: false }));
+hl.rotation.x = -Math.PI / 2; hl.visible = false; scene.add(hl);
+
+let hovered = null;
+function setHover(obj) {
+  if (hovered === obj) return;
+  if (hovered) hovered.scale.copy(hovered.userData.base);
+  hovered = obj;
+  renderer.domElement.style.cursor = obj ? 'pointer' : '';
+  if (!obj) { hl.visible = false; return; }
+  obj.scale.copy(obj.userData.base).multiplyScalar(1.12);
+  const info = obj.userData.info, z = ZONES[info.station || info.exit || info.room];
+  if (z) {
+    const [x1, y1, x2, y2] = z;
+    hl.scale.set((x2 - x1) / S, (y2 - y1) / S, 1);
+    hl.position.copy(toW((x1 + x2) / 2, (y1 + y2) / 2, 0.07));
+    hl.visible = true;
+  }
+}
+
+const tip = document.getElementById('tip'), ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+let dragging = false;
+renderer.domElement.addEventListener('pointermove', e => {
+  if (dragging) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(hoverables, false)[0];
+  setHover(hit ? hit.object : null);
+  if (!hit) { tip.style.display = 'none'; return; }
+  tip.innerHTML = buildTip(hit.object.userData.info);
+  tip.style.display = 'block';
+  const sc = r.width / VIEW_W;
+  let lx = (e.clientX - r.left) / sc + 16, ly = (e.clientY - r.top) / sc + 16;
+  if (lx + 310 > VIEW_W) lx -= 340;
+  if (ly + tip.offsetHeight > VIEW_H - 6) ly = VIEW_H - tip.offsetHeight - 6;
+  tip.style.left = lx + 'px'; tip.style.top = ly + 'px';
+});
+renderer.domElement.addEventListener('pointerleave', () => { setHover(null); tip.style.display = 'none'; });
+
+/* ================= CONTROLS ================= */
+
+let camGoal = null;
+const VIEWS = { '3d': [[0, 38, 36], [0, 0, 1]], top: [[0, 66, 0.1], [0, 0, 0]], low: [[-6, 12, 28], [0, 0, 2]] };
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
+  const [p, t] = VIEWS[b.dataset.view];
+  camGoal = { pos: new THREE.Vector3(...p), tgt: new THREE.Vector3(...t) };
+});
+controls.addEventListener('start', () => { camGoal = null; dragging = true; setHover(null); tip.style.display = 'none'; });
+controls.addEventListener('end', () => { dragging = false; });
+
+function warmup() { for (let i = 0; i < 1200; i++) simStep(0.1); }
+/* ================= LOOP ================= */
+warmup();
+const clock = new THREE.Clock(); let panelAcc = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05), now = clock.elapsedTime;
+  if (running) { const sdt = dt * speed, n = Math.ceil(sdt / 0.05); for (let i = 0; i < n; i++) simStep(sdt / n); }
+
+  for (const p of patients) {
+    const w = toW(p.pos.x, p.pos.y);
+    p.mesh.position.set(w.x, p.moving && running ? Math.abs(Math.sin(now * 12 + p.id)) * 0.1 : 0, w.z);
+    const red = (p.state === 'walking' || p.state === 'queued') && simMin(simTime - p.qStart) > 15;
+    if (red !== p.red) { p.red = red; p.mesh.userData.headMat.color.set(red ? '#ef4444' : '#f2c9a0'); }
+  }
+  STATIONS.forEach(drawBadge);
+  if ((panelAcc += dt) > 0.3) {
+    panelAcc = 0; updatePanel();
+    if (hovered) tip.innerHTML = buildTip(hovered.userData.info);   // อัปเดตข้อมูลสดขณะชี้เมาส์
+  }
+  if (hl.visible) hl.material.opacity = 0.22 + 0.12 * Math.sin(now * 5);
+
+  if (camGoal) {
+    camera.position.lerp(camGoal.pos, 0.08); controls.target.lerp(camGoal.tgt, 0.08);
+    if (camera.position.distanceTo(camGoal.pos) < 0.05) camGoal = null;
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

@@ -593,3 +593,176 @@ footer {
 .slider-dot.active {
     background: #10b981;
 }
+
+.opd-twin {
+    margin: 1.5rem 0 2rem;
+    padding: 1.25rem;
+    font-family: 'Prompt', 'Noto Sans Thai', sans-serif;
+}
+
+.opd-twin-head,
+.opd-twin-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.opd-twin-head h2 {
+    color: var(--primary-color);
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.opd-twin-head p,
+.opd-twin-note {
+    color: var(--light-text);
+    font-size: 0.92rem;
+}
+
+.opd-twin-date {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.opd-twin-date input,
+.opd-twin-date button,
+.opd-twin-views button,
+.opd-twin-hour {
+    font-family: inherit;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    padding: 0.4rem 0.7rem;
+}
+
+.opd-twin-date button,
+.opd-twin-views button,
+.opd-twin-hour {
+    cursor: pointer;
+}
+
+.opd-twin-views button.is-active,
+.opd-twin-hour.is-active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+.opd-twin-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0;
+}
+
+.opd-twin-card {
+    background: var(--secondary-color);
+    border: 1px solid #bbf7d0;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+}
+
+.opd-twin-card p {
+    color: var(--light-text);
+    font-size: 0.9rem;
+}
+
+.opd-twin-card strong {
+    display: inline-block;
+    margin-right: 0.25rem;
+    font-size: 1.8rem;
+    color: var(--primary-color);
+    line-height: 1.1;
+}
+
+.opd-twin-card span {
+    color: #4b5563;
+    font-size: 0.85rem;
+}
+
+.opd-twin-toolbar {
+    margin-bottom: 0.8rem;
+}
+
+.opd-twin-views,
+.opd-twin-hours {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.opd-twin-stage {
+    position: relative;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f4f1ea;
+}
+
+#opdTwinCanvas {
+    width: 100%;
+    height: min(72vh, 760px);
+    min-height: 460px;
+    touch-action: none;
+}
+
+#opdTwinCanvas canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+}
+
+.opd-twin-detail {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: min(280px, calc(100% - 24px));
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    box-shadow: var(--shadow);
+}
+
+.opd-twin-detail h3 {
+    font-size: 1.05rem;
+    margin: 0.15rem 0 0.6rem;
+}
+
+.opd-twin-kicker {
+    color: var(--primary-color);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.opd-twin-detail dl {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.opd-twin-detail dt {
+    color: var(--light-text);
+    font-size: 0.78rem;
+}
+
+.opd-twin-detail dd {
+    font-weight: 600;
+}
+
+.opd-twin-note {
+    margin-top: 0.7rem;
+}
+
+@media (max-width: 800px) {
+    .opd-twin-cards {
+        grid-template-columns: 1fr;
+    }
+
+    #opdTwinCanvas {
+        min-height: 380px;
+        height: 68vh;
+    }
+}

@@ -39,8 +39,22 @@ try {
 } catch(PDOException $e) {
     $externalLinks = [];
 }
-?>
 
+$twinNow = new DateTimeImmutable('now', new DateTimeZone('Asia/Bangkok'));
+$twinDate = $twinNow->format('Y-m-d');
+$requestedTwinDate = $_GET['twin_date'] ?? '';
+if (is_string($requestedTwinDate) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $requestedTwinDate, $dateParts)
+    && checkdate((int) $dateParts[2], (int) $dateParts[3], (int) $dateParts[1])) {
+    $twinDate = $requestedTwinDate;
+}
+$twinPayload = ['date' => $twinDate, 'defaultHour' => 9, 'rows' => [], 'status' => 'unavailable'];
+try {
+    require_once 'includes/opd_twin.php';
+    $twinPayload = opd_twin_payload($conn, $twinDate);
+} catch (Throwable $e) {
+    error_log('OPD twin: unable to read hourly statistics');
+}
+?>
 
 <?php
 // Check for active popup
@@ -124,6 +138,8 @@ $activeBanners = $conn->query("SELECT * FROM banners WHERE is_active = 1 ORDER B
         <p style="font-size: 1.2rem;">โรงพยาบาลชุมชนมาตรฐาน ประชาชนสุขภาพดี เจ้าหน้าที่มีความสุข</p>
     </div>
 </section>
+
+<?php include __DIR__ . '/includes/opd_twin_reference.php'; ?>
 
 <!-- Stats Section -->
 <!-- <section class="grid mt-2">
