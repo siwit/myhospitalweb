@@ -27,6 +27,7 @@ function opd_twin_payload(PDO $conn, string $date): array
     try {
         require_once __DIR__ . '/waittime/RushHourAggregator.php';
         RushHourAggregator::ensureTables($conn);
+        $capacities = RushHourAggregator::loadCapacities($conn);
         $stmtRh = $conn->prepare('SELECT *, updated_at AS rh_updated_at FROM rush_hour WHERE service_date = ? ORDER BY hour_slot');
         $stmtRh->execute([$date]);
         foreach ($stmtRh->fetchAll(PDO::FETCH_ASSOC) as $wide) {
@@ -63,7 +64,7 @@ function opd_twin_payload(PDO $conn, string $date): array
                     'avg_wait' => $avg,
                     'avg_service' => $svc,
                     'served' => $waiting,
-                    'capacity' => 4,
+                    'capacity' => RushHourAggregator::capacityFor($capacities, $code),
                 ];
             }
         }

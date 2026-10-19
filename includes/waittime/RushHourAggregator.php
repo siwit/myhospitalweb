@@ -8,50 +8,55 @@
  */
 class RushHourAggregator
 {
-    /** @var array<string, array{deps: string[], wait_col: ?string, service_col: ?string, twin_capacity: int}> */
+    /** @var array<string, array{deps: string[], wait_col: ?string, service_col: ?string}> */
     public const ZONES = [
         'exam_opd' => [
             'deps' => ['003', '004', '005', '029', '042'],
             'wait_col' => 'wait_doctor_minutes',
             'service_col' => 'doctor_minutes',
-            'twin_capacity' => 8,
         ],
         'screen_opd' => [
             'deps' => ['002', '022', '024'],
             'wait_col' => 'wait_screen_minutes',
             'service_col' => 'on_screen_minutes',
-            'twin_capacity' => 6,
         ],
         'pharmacy_opd' => [
             'deps' => ['007'],
             'wait_col' => 'wait_drug_minutes',
             'service_col' => null,
-            'twin_capacity' => 4,
         ],
         'pharmacy_ncd' => [
             'deps' => ['098'],
             'wait_col' => 'wait_drug_minutes',
             'service_col' => null,
-            'twin_capacity' => 3,
         ],
         'cashier' => [
             'deps' => ['006'],
             'wait_col' => null,
             'service_col' => null,
-            'twin_capacity' => 3,
         ],
         'screen_ncd' => [
             'deps' => ['023'],
             'wait_col' => 'wait_screen_minutes',
             'service_col' => 'on_screen_minutes',
-            'twin_capacity' => 4,
         ],
         'exam_ncd' => [
             'deps' => ['062'],
             'wait_col' => 'wait_doctor_minutes',
             'service_col' => 'doctor_minutes',
-            'twin_capacity' => 4,
         ],
+    ];
+
+    /** ค่าสำรองถ้ายังไม่มีแถวในตาราง capacity */
+    public const DEFAULT_CAPACITY = [
+        'exam_opd' => 8,
+        'screen_opd' => 6,
+        'lab' => 6,
+        'pharmacy_opd' => 4,
+        'cashier' => 3,
+        'screen_ncd' => 4,
+        'exam_ncd' => 4,
+        'pharmacy_ncd' => 3,
     ];
 
     /** cur_dep ทั้งหมดที่นับใน total_recipients (ไม่รวม LAB พิเศษ) */
@@ -75,6 +80,7 @@ class RushHourAggregator
         $files = [
             dirname(__DIR__, 2) . '/database/rush_hour.sql',
             dirname(__DIR__, 2) . '/database/opd_twin_hourly.sql',
+            dirname(__DIR__, 2) . '/database/capacity.sql',
         ];
         foreach ($files as $sqlFile) {
             if (!is_readable($sqlFile)) {
@@ -82,17 +88,58 @@ class RushHourAggregator
             }
             $sql = file_get_contents($sqlFile);
             foreach (array_filter(array_map('trim', explode(';', (string) $sql))) as $stmtSql) {
-                if ($stmtSql === '' || strpos($stmtSql, '--') === 0) {
+                // ตัดบรรทัดคอมเมนต์นำหน้าออก แล้วค่อยรัน
+                $lines = preg_split('/\R/', $stmtSql) ?: [];
+                $kept = [];
+                foreach ($lines as $line) {
+                    $trim = ltrim($line);
+                    if ($trim === '' || str_starts_with($trim, '--')) {
+                        continue;
+                    }
+                    $kept[] = $line;
+                }
+                $stmtSql = trim(implode("\n", $kept));
+                if ($stmtSql === '') {
                     continue;
                 }
                 try {
                     $conn->exec($stmtSql);
                 } catch (PDOException $e) {
-                    // already exists
+                    // already exists / duplicate seed
                 }
             }
         }
         self::ensureColumns($conn);
+    }
+
+    /**
+     * อ่านความจุจากตาราง capacity (zone_code => capacity)
+     *
+     * @return array<string, int>
+     */
+    public static function loadCapacities(PDO $conn): array
+    {
+        self::ensureTables($conn);
+        $out = self::DEFAULT_CAPACITY;
+        try {
+            $stmt = $conn->query('
+                SELECT zone_code, capacity
+                FROM capacity
+                WHERE is_active = 1
+            ');
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $code = (string) $row['zone_code'];
+                $out[$code] = max(1, (int) $row['capacity']);
+            }
+        } catch (PDOException $e) {
+            // ใช้ DEFAULT_CAPACITY
+        }
+        return $out;
+    }
+
+    public static function capacityFor(array $capacities, string $zone): int
+    {
+        return max(1, (int) ($capacities[$zone] ?? self::DEFAULT_CAPACITY[$zone] ?? 4));
     }
 
     /** rename history_* → screen_* และเพิ่ม *_service_minutes บนตารางเดิม */
@@ -390,15 +437,13 @@ class RushHourAggregator
               updated_at = CURRENT_TIMESTAMP
         ';
         $stmt = $conn->prepare($sql);
+        $capacities = self::loadCapacities($conn);
 
         foreach ($agg as $row) {
             foreach (self::ZONE_KEYS as $zone) {
                 $waiting = (int) ($row["{$zone}_waiting"] ?? 0);
                 $waitAvg = self::floatOrNull($row["{$zone}_avg_minutes"] ?? null) ?? 0.0;
                 $svcAvg = self::floatOrNull($row["{$zone}_service_minutes"] ?? null) ?? 0.0;
-                $capacity = $zone === 'lab'
-                    ? 6
-                    : (int) (self::ZONES[$zone]['twin_capacity'] ?? 4);
                 $stmt->execute([
                     'service_date' => $row['service_date'],
                     'hour_slot' => $row['hour_slot'],
@@ -408,7 +453,7 @@ class RushHourAggregator
                     'avg_wait_minutes' => $waitAvg,
                     'avg_service_minutes' => $svcAvg,
                     'served_count' => $waiting,
-                    'capacity' => $capacity,
+                    'capacity' => self::capacityFor($capacities, $zone),
                 ]);
             }
         }
@@ -422,6 +467,7 @@ class RushHourAggregator
     public static function fetchTwinRows(PDO $conn, string $date): array
     {
         self::ensureTables($conn);
+        $capacities = self::loadCapacities($conn);
         $stmt = $conn->prepare('
             SELECT *
             FROM rush_hour
@@ -436,9 +482,6 @@ class RushHourAggregator
                 $waiting = (int) ($wide["{$zone}_waiting"] ?? 0);
                 $waitAvg = self::floatOrNull($wide["{$zone}_avg_minutes"] ?? null) ?? 0.0;
                 $svcAvg = self::floatOrNull($wide["{$zone}_service_minutes"] ?? null) ?? 0.0;
-                $capacity = $zone === 'lab'
-                    ? 6
-                    : (int) (self::ZONES[$zone]['twin_capacity'] ?? 4);
                 $rows[] = [
                     'hour' => $hour,
                     'zone' => $zone,
@@ -446,7 +489,7 @@ class RushHourAggregator
                     'avg_wait' => $waitAvg,
                     'avg_service' => $svcAvg,
                     'served' => $waiting,
-                    'capacity' => $capacity,
+                    'capacity' => self::capacityFor($capacities, $zone),
                     'total_recipients' => (int) ($wide['total_recipients'] ?? 0),
                     'avg_total_service' => self::floatOrNull($wide['avg_total_service_minutes'] ?? null),
                 ];

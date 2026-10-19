@@ -132,7 +132,7 @@ const SIM_DAY_WALL_SEC = (SIM_DAY_END_H - SIM_DAY_START_H) * 3600;
 const SIM_DAY_SIM_SEC = SIM_DAY_WALL_SEC / SIM_SCALE;
 const WALK = 55;                           // ความเร็วเดิน (px/วินาที)
 const SP = 18;                             // ระยะห่างคนในคิวจำลอง (px)
-const LIVE_SP = 24;                        // ระยะห่างคนในแถวจากข้อมูลจริง (px)
+const LIVE_SP = 8;                         // ระยะห่างคนในแถวจากข้อมูลจริง (px)
 const C_OPD = '#2563eb', C_NCD = '#f97316', C_STAFF = '#0d9488';
 const toW = (x, y, h = 0) => new THREE.Vector3((x - CX) / S, h, (y - CY) / S);
 /** ชั่วโมงบริการจากเวลาจริง รายคาบ: 06–15; หลัง 15:59 จนถึงก่อน 06:00 ค้างที่ 15 */
