@@ -50,6 +50,9 @@ class WaitTimeStore
             "ALTER TABLE waittime_visit_anon ADD COLUMN wait_screen_minutes INT DEFAULT NULL AFTER current_department",
             "ALTER TABLE waittime_visit_anon ADD COLUMN on_screen_minutes INT DEFAULT NULL AFTER wait_screen_minutes",
             "ALTER TABLE waittime_visit_anon ADD KEY idx_waittime_cur_dep (cur_depcode)",
+            "ALTER TABLE waittime_visit_anon ADD COLUMN lab_order_time DATETIME DEFAULT NULL AFTER lab_total_minutes",
+            "ALTER TABLE waittime_visit_anon ADD COLUMN lab_receive_time DATETIME DEFAULT NULL AFTER lab_order_time",
+            "ALTER TABLE waittime_visit_anon ADD COLUMN lab_report_time DATETIME DEFAULT NULL AFTER lab_receive_time",
             // ย้ายค่าจากชื่อเดิม (ถ้ามี) ไปชื่อใหม่
             "UPDATE waittime_visit_anon SET wait_screen_minutes = wait_history_minutes WHERE wait_screen_minutes IS NULL AND wait_history_minutes IS NOT NULL",
             "UPDATE waittime_visit_anon SET on_screen_minutes = history_minutes WHERE on_screen_minutes IS NULL AND history_minutes IS NOT NULL",

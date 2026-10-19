@@ -66,6 +66,7 @@ $upsert = $conn->prepare("
       wait_screen_minutes, on_screen_minutes, wait_doctor_minutes, doctor_minutes,
       wait_drug_minutes, total_opd_minutes,
       lab_item_count, lab_wait_receive_minutes, lab_process_minutes, lab_total_minutes,
+      lab_order_time, lab_receive_time, lab_report_time,
       xray_item_count, xray_wait_minutes, xray_process_minutes, xray_total_minutes,
       synced_at
     ) VALUES (
@@ -79,6 +80,7 @@ $upsert = $conn->prepare("
       :wait_screen_minutes, :on_screen_minutes, :wait_doctor_minutes, :doctor_minutes,
       :wait_drug_minutes, :total_opd_minutes,
       :lab_item_count, :lab_wait_receive_minutes, :lab_process_minutes, :lab_total_minutes,
+      :lab_order_time, :lab_receive_time, :lab_report_time,
       :xray_item_count, :xray_wait_minutes, :xray_process_minutes, :xray_total_minutes,
       :synced_at
     )
@@ -109,6 +111,9 @@ $upsert = $conn->prepare("
       lab_wait_receive_minutes = VALUES(lab_wait_receive_minutes),
       lab_process_minutes = VALUES(lab_process_minutes),
       lab_total_minutes = VALUES(lab_total_minutes),
+      lab_order_time = VALUES(lab_order_time),
+      lab_receive_time = VALUES(lab_receive_time),
+      lab_report_time = VALUES(lab_report_time),
       xray_item_count = VALUES(xray_item_count),
       xray_wait_minutes = VALUES(xray_wait_minutes),
       xray_process_minutes = VALUES(xray_process_minutes),
@@ -132,6 +137,24 @@ $strOrNull = static function ($v) {
         return null;
     }
     return (string)$v;
+};
+$dtOrNull = static function ($v) {
+    if ($v === null || $v === '') {
+        return null;
+    }
+    $s = trim((string)$v);
+    if ($s === '' || strpos($s, '0000-00-00') === 0) {
+        return null;
+    }
+    // รับรูปแบบ Y-m-d H:i:s หรือ ISO
+    if (preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/', $s)) {
+        return str_replace('T', ' ', substr($s, 0, 19));
+    }
+    $ts = strtotime($s);
+    if ($ts === false) {
+        return null;
+    }
+    return date('Y-m-d H:i:s', $ts);
 };
 
 $syncedAt = date('Y-m-d H:i:s');
@@ -179,6 +202,9 @@ try {
             'lab_wait_receive_minutes' => $intOrNull($row['lab_wait_receive_minutes'] ?? null),
             'lab_process_minutes' => $intOrNull($row['lab_process_minutes'] ?? null),
             'lab_total_minutes' => $intOrNull($row['lab_total_minutes'] ?? null),
+            'lab_order_time' => $dtOrNull($row['lab_order_time'] ?? null),
+            'lab_receive_time' => $dtOrNull($row['lab_receive_time'] ?? null),
+            'lab_report_time' => $dtOrNull($row['lab_report_time'] ?? null),
             'xray_item_count' => $intOrNull($row['xray_item_count'] ?? null),
             'xray_wait_minutes' => $intOrNull($row['xray_wait_minutes'] ?? null),
             'xray_process_minutes' => $intOrNull($row['xray_process_minutes'] ?? null),
@@ -213,10 +239,21 @@ try {
     wt_json_exit(500, ['ok' => false, 'error' => 'ingest_failed', 'message' => $e->getMessage()]);
 }
 
+// สรุป rush_hour หลัง ingest (best-effort ไม่ทำให้ sync ล้ม)
+$rushHour = null;
+try {
+    require_once dirname(__DIR__) . '/includes/waittime/RushHourAggregator.php';
+    $rushHour = RushHourAggregator::rebuild($conn, $dateFrom, $dateTo);
+} catch (Throwable $e) {
+    error_log('waittime_ingest rush_hour rebuild: ' . $e->getMessage());
+    $rushHour = ['error' => $e->getMessage()];
+}
+
 wt_json_exit(200, [
     'ok' => true,
     'date_from' => $dateFrom,
     'date_to' => $dateTo,
     'upserted' => $okCount,
     'synced_at' => $syncedAt,
+    'rush_hour' => $rushHour,
 ]);

@@ -44,15 +44,15 @@
   #toolbar input[type=range]{width:90px}
   #legend{position:absolute;bottom:10px;left:10px;background:rgba(15,23,42,.82);color:#e2e8f0;font-size:12px;padding:6px 10px;border-radius:8px;display:flex;gap:12px;flex-wrap:wrap}
   #legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
-  #tip{position:absolute;pointer-events:none;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:12px;padding:10px 12px;border-radius:10px;display:none;width:300px;border:1px solid #334155;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:5;line-height:1.4}
-  .tt-h{display:flex;align-items:center;gap:6px;font-size:15px;color:#fff}
-  .tt-h i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  #tip{position:absolute;pointer-events:none;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:12px;padding:12px 14px;border-radius:12px;display:none;width:360px;border:1px solid #334155;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:5;line-height:1.4}
+  .tt-h{display:flex;align-items:center;gap:8px;font-size:15px;color:#fff}
+  .tt-h i{width:12px;height:12px;border-radius:3px;display:inline-block}
   .chip{margin-left:auto;font-size:11px;padding:1px 8px;border-radius:999px;color:#fff;font-weight:600;white-space:nowrap}
   .tt-k{color:#94a3b8;font-size:11px;margin:2px 0 8px}
-  .tt-g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
-  .tt-g div{background:#111c33;border-radius:8px;padding:5px 4px;text-align:center}
+  .tt-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+  .tt-g div{background:#111c33;border-radius:10px;padding:8px 6px;text-align:center}
   .tt-g b{display:block;font-size:16px;color:#fff}
-  .tt-g span{font-size:10px;color:#94a3b8;line-height:1.2;display:block}
+  .tt-g span{font-size:10px;color:#94a3b8;line-height:1.25;display:block}
   .tt-u{font-size:11px;color:#94a3b8}
   /* ขยายตัวอักษร Noto Sans Thai อีก 20% โดยคงขนาดผัง 3D เดิม */
   .title{font-size:22.8px}
@@ -65,12 +65,12 @@
   .tag{font-size:12px}
   .rq b{font-size:22.8px}
   #toolbar,#toolbar button{font-size:15.6px}
-  #legend,#tip{font-size:14.4px}
-  .tt-h{font-size:18px}
-  .chip{font-size:13.2px}
-  .tt-k{font-size:13.2px}
-  .tt-g b{font-size:19.2px}
-  .tt-g span,.tt-u{font-size:12px}
+  #legend,#tip{font-size:16px}
+  .tt-h{font-size:22px}
+  .chip{font-size:14px}
+  .tt-k{font-size:14px}
+  .tt-g b{font-size:26px}
+  .tt-g span,.tt-u{font-size:15px}
 </style>
 <script type="importmap">
 { "imports": {
@@ -679,15 +679,16 @@ function updatePanel() {
 /* ================= TOOLTIP (ป้ายชื่อห้อง) ================= */
 function stationTip(st) {
   const live = liveRows.get(st.id);
-  const n = live ? Number(live.waiting || 0) : st.queue.length;
-  const avgW = live ? Number(live.avg_wait || 0).toFixed(1) : (st.waitN ? simMin(st.waitSum / st.waitN).toFixed(1) : '-');
-  const serviceMean = live ? Number(live.avg_service || 0) : simMin(st.mean);
-  const [stTxt, stCol] = statusOf(n);
-  return `<div class="tt-h"><i style="background:${st.color}"></i><b>${st.name}</b><span class="chip" style="background:${stCol}">${stTxt}</span></div>
-    <div class="tt-g" style="margin-bottom:0">
-      <div><b>${n}</b><span>จำนวนผู้รอคิว<br>(ราย)</span></div>
-      <div><b>${avgW}</b><span>วลารอเฉลี่ย<br>(นาที/ราย)</span></div>
-      <div><b>${serviceMean.toFixed(1)}</b><span>เวลารับบริการเฉลี่ย<br>(นาที/ราย)</span></div>
+  const avgW = live
+    ? Number(live.avg_wait || 0).toFixed(1)
+    : (st.waitN ? simMin(st.waitSum / st.waitN).toFixed(1) : '-');
+  const serviceMean = live
+    ? Number(live.avg_service || 0).toFixed(1)
+    : simMin(st.mean).toFixed(1);
+  return `<div class="tt-h"><i style="background:${st.color}"></i><b>${st.name}</b></div>
+    <div class="tt-g" style="margin-bottom:0;grid-template-columns:1fr 1fr">
+      <div><b>${avgW}</b><span>ระยะเวลารอคอยเฉลี่ย<br>(นาที/ราย)</span></div>
+      <div><b>${serviceMean}</b><span>เวลารับบริการเฉลี่ย<br>(นาที/ราย)</span></div>
     </div>`;
 }
 function buildTip(info) {
