@@ -9,10 +9,10 @@ function opd_twin_zones(): array
         'exam_opd' => ['name' => 'ห้องตรวจ OPD', 'kind' => 'door'],
         'lab' => ['name' => 'ห้องเจาะเลือด LAB', 'kind' => 'counter'],
         'exam_ncd' => ['name' => 'ห้องตรวจ NCD', 'kind' => 'door'],
-        'history_opd' => ['name' => 'จุดซักประวัติ OPD', 'kind' => 'counter'],
+        'screen_opd' => ['name' => 'จุดซักประวัติ OPD', 'kind' => 'counter'],
         'pharmacy_opd' => ['name' => 'ห้องจ่ายยา OPD', 'kind' => 'counter'],
         'pharmacy_ncd' => ['name' => 'ห้องจ่ายยา NCD', 'kind' => 'counter'],
-        'history_ncd' => ['name' => 'จุดซักประวัติ NCD', 'kind' => 'counter'],
+        'screen_ncd' => ['name' => 'จุดซักประวัติ NCD', 'kind' => 'counter'],
         'cashier' => ['name' => 'ห้องจ่ายเงิน', 'kind' => 'counter'],
     ];
 }

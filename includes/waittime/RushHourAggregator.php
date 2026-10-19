@@ -12,7 +12,7 @@ class RushHourAggregator
             'avg_col' => 'doctor_minutes',
             'twin_capacity' => 8,
         ],
-        'history_opd' => [
+        'screen_opd' => [
             'deps' => ['002', '022', '024'],
             'avg_col' => 'on_screen_minutes',
             'twin_capacity' => 6,
@@ -32,7 +32,7 @@ class RushHourAggregator
             'avg_col' => null,
             'twin_capacity' => 3,
         ],
-        'history_ncd' => [
+        'screen_ncd' => [
             'deps' => ['023'],
             'avg_col' => 'on_screen_minutes',
             'twin_capacity' => 4,
@@ -74,6 +74,27 @@ class RushHourAggregator
                 } catch (PDOException $e) {
                     // already exists
                 }
+            }
+        }
+        self::ensureColumns($conn);
+    }
+
+    /** rename history_* → screen_* บนตารางเดิม */
+    public static function ensureColumns(PDO $conn): void
+    {
+        $alters = [
+            "ALTER TABLE rush_hour CHANGE COLUMN history_opd_waiting screen_opd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ซักประวัติ/screen OPD cur_dep 002,022,024'",
+            "ALTER TABLE rush_hour CHANGE COLUMN history_opd_avg_minutes screen_opd_avg_minutes DECIMAL(6,1) DEFAULT NULL",
+            "ALTER TABLE rush_hour CHANGE COLUMN history_ncd_waiting screen_ncd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ซักประวัติ/screen NCD cur_dep 023'",
+            "ALTER TABLE rush_hour CHANGE COLUMN history_ncd_avg_minutes screen_ncd_avg_minutes DECIMAL(6,1) DEFAULT NULL",
+            "UPDATE opd_twin_hourly SET zone_code = 'screen_opd' WHERE zone_code = 'history_opd'",
+            "UPDATE opd_twin_hourly SET zone_code = 'screen_ncd' WHERE zone_code = 'history_ncd'",
+        ];
+        foreach ($alters as $sql) {
+            try {
+                $conn->exec($sql);
+            } catch (PDOException $e) {
+                // column already renamed / table missing
             }
         }
     }
@@ -272,22 +293,22 @@ class RushHourAggregator
             INSERT INTO rush_hour (
               service_date, hour_slot, slot_label,
               exam_opd_waiting, exam_opd_avg_minutes,
-              history_opd_waiting, history_opd_avg_minutes,
+              screen_opd_waiting, screen_opd_avg_minutes,
               pharmacy_opd_waiting, pharmacy_opd_avg_minutes,
               pharmacy_ncd_waiting, pharmacy_ncd_avg_minutes,
               cashier_waiting, cashier_avg_minutes,
-              history_ncd_waiting, history_ncd_avg_minutes,
+              screen_ncd_waiting, screen_ncd_avg_minutes,
               exam_ncd_waiting, exam_ncd_avg_minutes,
               lab_waiting, lab_avg_minutes,
               avg_total_service_minutes, total_recipients
             ) VALUES (
               :service_date, :hour_slot, :slot_label,
               :exam_opd_waiting, :exam_opd_avg_minutes,
-              :history_opd_waiting, :history_opd_avg_minutes,
+              :screen_opd_waiting, :screen_opd_avg_minutes,
               :pharmacy_opd_waiting, :pharmacy_opd_avg_minutes,
               :pharmacy_ncd_waiting, :pharmacy_ncd_avg_minutes,
               :cashier_waiting, :cashier_avg_minutes,
-              :history_ncd_waiting, :history_ncd_avg_minutes,
+              :screen_ncd_waiting, :screen_ncd_avg_minutes,
               :exam_ncd_waiting, :exam_ncd_avg_minutes,
               :lab_waiting, :lab_avg_minutes,
               :avg_total_service_minutes, :total_recipients
@@ -296,16 +317,16 @@ class RushHourAggregator
               slot_label = VALUES(slot_label),
               exam_opd_waiting = VALUES(exam_opd_waiting),
               exam_opd_avg_minutes = VALUES(exam_opd_avg_minutes),
-              history_opd_waiting = VALUES(history_opd_waiting),
-              history_opd_avg_minutes = VALUES(history_opd_avg_minutes),
+              screen_opd_waiting = VALUES(screen_opd_waiting),
+              screen_opd_avg_minutes = VALUES(screen_opd_avg_minutes),
               pharmacy_opd_waiting = VALUES(pharmacy_opd_waiting),
               pharmacy_opd_avg_minutes = VALUES(pharmacy_opd_avg_minutes),
               pharmacy_ncd_waiting = VALUES(pharmacy_ncd_waiting),
               pharmacy_ncd_avg_minutes = VALUES(pharmacy_ncd_avg_minutes),
               cashier_waiting = VALUES(cashier_waiting),
               cashier_avg_minutes = VALUES(cashier_avg_minutes),
-              history_ncd_waiting = VALUES(history_ncd_waiting),
-              history_ncd_avg_minutes = VALUES(history_ncd_avg_minutes),
+              screen_ncd_waiting = VALUES(screen_ncd_waiting),
+              screen_ncd_avg_minutes = VALUES(screen_ncd_avg_minutes),
               exam_ncd_waiting = VALUES(exam_ncd_waiting),
               exam_ncd_avg_minutes = VALUES(exam_ncd_avg_minutes),
               lab_waiting = VALUES(lab_waiting),
@@ -323,16 +344,16 @@ class RushHourAggregator
                 'slot_label' => $row['slot_label'],
                 'exam_opd_waiting' => $row['exam_opd_waiting'],
                 'exam_opd_avg_minutes' => $row['exam_opd_avg_minutes'],
-                'history_opd_waiting' => $row['history_opd_waiting'],
-                'history_opd_avg_minutes' => $row['history_opd_avg_minutes'],
+                'screen_opd_waiting' => $row['screen_opd_waiting'],
+                'screen_opd_avg_minutes' => $row['screen_opd_avg_minutes'],
                 'pharmacy_opd_waiting' => $row['pharmacy_opd_waiting'],
                 'pharmacy_opd_avg_minutes' => $row['pharmacy_opd_avg_minutes'],
                 'pharmacy_ncd_waiting' => $row['pharmacy_ncd_waiting'],
                 'pharmacy_ncd_avg_minutes' => $row['pharmacy_ncd_avg_minutes'],
                 'cashier_waiting' => $row['cashier_waiting'],
                 'cashier_avg_minutes' => $row['cashier_avg_minutes'],
-                'history_ncd_waiting' => $row['history_ncd_waiting'],
-                'history_ncd_avg_minutes' => $row['history_ncd_avg_minutes'],
+                'screen_ncd_waiting' => $row['screen_ncd_waiting'],
+                'screen_ncd_avg_minutes' => $row['screen_ncd_avg_minutes'],
                 'exam_ncd_waiting' => $row['exam_ncd_waiting'],
                 'exam_ncd_avg_minutes' => $row['exam_ncd_avg_minutes'],
                 'lab_waiting' => $row['lab_waiting'],

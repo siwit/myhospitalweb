@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS rush_hour (
   exam_opd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ห้องตรวจ OPD cur_dep 003,004,005,029,042',
   exam_opd_avg_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'เวลารับบริการเฉลี่ย นาที/ราย',
 
-  history_opd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ซักประวัติ OPD cur_dep 002,022,024',
-  history_opd_avg_minutes DECIMAL(6,1) DEFAULT NULL,
+  screen_opd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ซักประวัติ/screen OPD cur_dep 002,022,024',
+  screen_opd_avg_minutes DECIMAL(6,1) DEFAULT NULL,
 
   pharmacy_opd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'จ่ายยา OPD cur_dep 007',
   pharmacy_opd_avg_minutes DECIMAL(6,1) DEFAULT NULL,
@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS rush_hour (
   cashier_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ห้องจ่ายเงิน cur_dep 006',
   cashier_avg_minutes DECIMAL(6,1) DEFAULT NULL,
 
-  history_ncd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ซักประวัติ NCD cur_dep 023',
-  history_ncd_avg_minutes DECIMAL(6,1) DEFAULT NULL,
+  screen_ncd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ซักประวัติ/screen NCD cur_dep 023',
+  screen_ncd_avg_minutes DECIMAL(6,1) DEFAULT NULL,
 
   exam_ncd_waiting INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ห้องตรวจ NCD cur_dep 062',
   exam_ncd_avg_minutes DECIMAL(6,1) DEFAULT NULL,

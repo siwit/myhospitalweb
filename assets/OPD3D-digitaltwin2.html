@@ -24,8 +24,8 @@
   .kpis b{display:block;font-size:22px;color:#fff;line-height:1.2}
   .kpis span{font-size:11px;color:#94a3b8;white-space:nowrap}
   .sec{font-size:12px;color:#94a3b8;font-weight:600;letter-spacing:.3px}
-  #list{display:flex;flex-direction:column;gap:6px}
-  .st{background:#111c33;border-radius:10px;padding:7px 10px 7px 10px;border-left:4px solid var(--c)}
+  #list,#hourList{display:flex;flex-direction:column;gap:16px}
+  .st{background:#111c33;border-radius:10px;padding:12px 12px;border-left:4px solid var(--c);margin:0}
   .row{display:flex;justify-content:space-between;align-items:center;gap:6px}
   .name{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;white-space:nowrap}
   .tag{font-size:10px;padding:1px 6px;border-radius:4px;background:#1e293b;color:#94a3b8;font-weight:400}
@@ -33,9 +33,9 @@
   .rq{white-space:nowrap}
   .rq b{font-size:19px}
   .rq small{font-size:11px;color:#94a3b8;margin-left:3px}
-  .bar{height:6px;background:#1e293b;border-radius:3px;overflow:hidden;margin:4px 0}
+  .bar{height:6px;background:#1e293b;border-radius:3px;overflow:hidden;margin:8px 0}
   .bar span{display:block;height:100%;width:0;transition:width .3s,background .3s}
-  .mini{display:grid;grid-template-columns:repeat(3,1fr);font-size:11px;color:#94a3b8;white-space:nowrap}
+  .mini{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:11px;color:#94a3b8;white-space:nowrap}
   .mini b{color:#e2e8f0;font-weight:600}
   #toolbar{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:rgba(15,23,42,.82);padding:8px 10px;border-radius:10px;color:#e2e8f0;font-size:13px}
   #toolbar button{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit;font-size:13px}
@@ -58,8 +58,10 @@
   .title{font-size:22.8px}
   .sub{font-size:14.4px}
   .clock{font-size:33.6px}
-  .kpis b{font-size:26.4px}
-  .kpis span,.rq small,.mini{font-size:13.2px}
+  .kpis b{font-size:33px}
+  .kpis span{font-size:16.5px}
+  .rq small{font-size:13.2px}
+  .mini{font-size:15.972px}
   .sec{font-size:14.4px}
   .name{font-size:16.8px}
   .tag{font-size:12px}
@@ -105,8 +107,8 @@
     </div>
     <div class="kpis">
       <div><b id="kIn">0</b><span>ผู้รับบริการ</span></div>
-      <div><b id="kDone">-</b><span>เวลาเฉลี่ย นาที/ราย</span></div>
-<div><b id="kLos">0%</b><span>ความหนาแน่น %</span></div>
+      <div><b id="kDone">-</b><span>รอเฉลี่ย นาที/ราย</span></div>
+      <div><b id="kLos">0%</b><span>ความแออัด %</span></div>
     </div>
     <div class="sec">ช่วงเวลารายชั่วโมง</div>
     <div id="hourList"></div>
@@ -139,7 +141,7 @@ function serviceHourFromReal(date = new Date()) {
 function serviceClockText(date = new Date()) {
   return `${String(serviceHourFromReal(date)).padStart(2, '0')}:00`;
 }
-const LIVE_ZONE = { insurance:'reg', register:'reg', exam_opd:'examOPD', lab:'lab', exam_ncd:'examNCD', history_opd:'triOPD', pharmacy_opd:'pharmOPD', pharmacy_ncd:'pharmNCD', history_ncd:'triNCD', cashier:'cashier' };
+const LIVE_ZONE = { insurance:'reg', register:'reg', exam_opd:'examOPD', lab:'lab', exam_ncd:'examNCD', screen_opd:'triOPD', history_opd:'triOPD', pharmacy_opd:'pharmOPD', pharmacy_ncd:'pharmNCD', screen_ncd:'triNCD', history_ncd:'triNCD', cashier:'cashier' };
 const LIVE_DATE = window.__OPD_TWIN_DATE__ || null;
 const LIVE_ROWS = Array.isArray(window.__OPD_TWIN_ROWS__) ? window.__OPD_TWIN_ROWS__ : [];
 const LIVE_LATEST_HOUR = Number.isInteger(window.__OPD_TWIN_LATEST_HOUR__) ? window.__OPD_TWIN_LATEST_HOUR__ : null;
@@ -603,10 +605,16 @@ function hourlySummary(rows) {
   const waiting = rows.reduce((sum, row) => sum + Number(row.waiting || 0), 0);
   const capacity = rows.reduce((sum, row) => sum + Number(row.capacity || 0), 0);
   const served = rows.reduce((sum, row) => sum + Number(row.served || 0), 0);
-  const service = served ? rows.reduce((sum, row) => sum + Number(row.avg_service || 0) * Number(row.served || 0), 0) / served : 0;
+  const weight = served > 0 ? served : waiting;
+  const service = weight
+    ? rows.reduce((sum, row) => sum + Number(row.avg_service || 0) * Number(row.served || row.waiting || 0), 0) / weight
+    : 0;
+  const wait = weight
+    ? rows.reduce((sum, row) => sum + Number(row.avg_wait || 0) * Number(row.served || row.waiting || 0), 0) / weight
+    : 0;
   // จำนวนผู้รับบริการต่อช่วงเวลา: ใช้ served ถ้ามี ไม่เช่นนั้นใช้ waiting
   const recipients = served > 0 ? served : waiting;
-  return { waiting, capacity, served, recipients, density: capacity ? waiting / capacity * 100 : 0, service };
+  return { waiting, capacity, served, recipients, density: capacity ? waiting / capacity * 100 : 0, service, wait };
 }
 function buildHourSlots() {
   const nowH = new Date().getHours();
@@ -637,7 +645,7 @@ function renderHourlyList() {
     ...hourlySummary(liveHourly.get(hour) || liveHourly.get(String(hour)) || []),
   }));
   const maxRecipients = Math.max(1, ...summaries.map((item) => item.recipients));
-  const maxService = summaries.reduce((best, item) => item.service > best.service ? item : best, summaries[0] || { hour: LIVE_HOUR, service: 0 });
+  const maxWait = summaries.reduce((best, item) => item.wait > best.wait ? item : best, summaries[0] || { hour: LIVE_HOUR, wait: 0 });
   const maxDensityValue = summaries.reduce((best, item) => Math.max(best, item.density), 0);
   summaries.forEach((item) => {
     const el = document.createElement('div');
@@ -646,12 +654,12 @@ function renderHourlyList() {
     el.style.setProperty('--c', item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b');
     const highlights = [];
     if (item.density === maxDensityValue && maxDensityValue > 0) highlights.push('แออัดสูงสุด');
-    if (item.service === maxService.service && maxService.service > 0) highlights.push('ใช้เวลามากสุด');
+    if (item.wait === maxWait.wait && maxWait.wait > 0) highlights.push('รอนานสุด');
     const tags = highlights.map((label) => `<span class="tag highlight">${label}</span>`).join('');
     el.innerHTML = `<div class="row"><div class="name">${item.label}${tags}</div>
         <div class="rq"><b>${item.recipients}</b><small>ราย</small></div></div>
       <div class="bar"><span style="width:${Math.min(100, item.recipients / maxRecipients * 100)}%;background:${item.hour === LIVE_HOUR ? '#38bdf8' : '#64748b'}"></span></div>
-      <div class="mini"><div>รับบริการ <b>${item.served}</b></div><div>รับบริการเฉลี่ย <b>${item.service.toFixed(1)} น.</b></div><div>หนาแน่น <b>${item.density.toFixed(0)}%</b></div></div>`;
+      <div class="mini"><div>รอเฉลี่ย <b>${item.wait.toFixed(1)} นาที/ราย</b></div><div>ความแออัด <b>${item.density.toFixed(0)}%</b></div></div>`;
     el.style.cursor = 'pointer';
     el.addEventListener('click', () => {
       selectedLiveHour = item.hour;
@@ -664,7 +672,7 @@ function renderHourlyList() {
       seedLiveVisuals(item.hour);
       document.getElementById('clock').textContent = `${String(item.hour).padStart(2, '0')}:00`;
       document.getElementById('kIn').textContent = item.recipients;
-      document.getElementById('kDone').textContent = item.service.toFixed(1);
+      document.getElementById('kDone').textContent = item.wait.toFixed(1);
       document.getElementById('kLos').textContent = item.density.toFixed(0) + '%';
       hourList.querySelectorAll('.st').forEach((card) => card.classList.remove('selected'));
       el.classList.add('selected');
@@ -702,7 +710,7 @@ function updatePanel() {
     ? hourlySummary(selectedRows || liveHourly.get(liveHourForKpi) || liveHourly.get(LIVE_HOUR) || [...liveRows.values()])
     : null;
   document.getElementById('kIn').textContent = currentSummary ? currentSummary.recipients : patients.length;
-  document.getElementById('kDone').textContent = currentSummary ? currentSummary.service.toFixed(1) : (done ? simMin(losSum / done).toFixed(0) : '-');
+  document.getElementById('kDone').textContent = currentSummary ? currentSummary.wait.toFixed(1) : (done ? simMin(losSum / done).toFixed(0) : '-');
   document.getElementById('kLos').textContent = currentSummary ? currentSummary.density.toFixed(0) + '%' : Math.min(100, Math.round((patients.length / 150) * 100)) + '%';
   if (hasLiveData || liveHourly.size > 0) return;
   STATIONS.forEach(st => {
@@ -728,7 +736,7 @@ function stationTip(st) {
     : simMin(st.mean).toFixed(1);
   return `<div class="tt-h"><i style="background:${st.color}"></i><b>${st.name}</b></div>
     <div class="tt-g" style="margin-bottom:0;grid-template-columns:1fr 1fr">
-      <div><b>${avgW}</b><span>ระยะเวลารอคอยเฉลี่ย<br>(นาที/ราย)</span></div>
+      <div><b>${avgW}</b><span>รอคอยเฉลี่ย<br>(นาที/ราย)</span></div>
       <div><b>${serviceMean}</b><span>เวลารับบริการเฉลี่ย<br>(นาที/ราย)</span></div>
     </div>`;
 }
