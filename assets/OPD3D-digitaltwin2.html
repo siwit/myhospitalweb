@@ -39,11 +39,12 @@
   .bar span{display:block;height:100%;width:0;transition:width .3s,background .3s}
   .mini{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:11px;color:#94a3b8;white-space:nowrap}
   .mini b{color:#e2e8f0;font-weight:600}
-  #toolbar{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:rgba(15,23,42,.82);padding:8px 10px;border-radius:10px;color:#e2e8f0;font-size:13px}
+  #toolbar{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:rgba(15,23,42,.82);padding:8px 10px;border-radius:10px;color:#e2e8f0;font-size:13px;z-index:4}
   #toolbar button{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit;font-size:13px}
   #toolbar button:hover{background:#334155}
   #toolbar label{display:flex;align-items:center;gap:4px;margin-left:6px}
   #toolbar input[type=range]{width:90px}
+  #toolbar input[type=date]{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 8px;font-family:inherit;font-size:13px;color-scheme:dark}
   #legend{position:absolute;bottom:10px;left:10px;background:rgba(15,23,42,.82);color:#e2e8f0;font-size:12px;padding:6px 10px;border-radius:8px;display:flex;gap:12px;flex-wrap:wrap}
   #legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
   #tip{position:absolute;pointer-events:none;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:12px;padding:12px 14px;border-radius:12px;display:none;width:360px;border:1px solid #334155;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:5;line-height:1.4}
@@ -68,7 +69,7 @@
   .name{font-size:16.8px}
   .tag{font-size:12px}
   .rq b{font-size:22.8px}
-  #toolbar,#toolbar button{font-size:15.6px}
+  #toolbar,#toolbar button,#toolbar label,#toolbar input[type=date]{font-size:15.6px}
   #legend,#tip{font-size:16px}
   .tt-h{font-size:22px}
   .chip{font-size:14px}
@@ -90,6 +91,9 @@
       <button data-view="3d">มุม 3D</button>
       <button data-view="top">มุมบน</button>
       <button data-view="low">มุมต่ำ</button>
+      <label>วันที่
+        <input type="date" id="twinDate" title="เลือกวันดูย้อนหลังจาก rush_hour">
+      </label>
     </div>
     <!-- <div id="legend">
       <span><i style="background:#2563eb"></i>ผู้ป่วย OPD</span>
@@ -104,7 +108,7 @@
   </div>
   <div id="panel">
     <div class="head">
-      <div><div class="title">🏥 OPD Hour</div><div class="sub">จำลองการรับบริการในแต่ละช่วงเวลา</div></div>
+      <div><div class="title">🏥OPD Crowding</div><div class="sub">จำลองการรับบริการในแต่ละช่วงเวลา</div></div>
       <div class="clockBox"><div class="clock" id="clock">06:00</div><div class="sub">เวลาจำลอง</div></div>
     </div>
     <div class="kpis">
@@ -762,7 +766,6 @@ function renderHourlyList() {
     label: HOUR_SLOTS[hour] || `${String(hour).padStart(2, '0')}:00-${String(hour).padStart(2, '0')}:59 น.`,
     ...hourlySummary(liveHourly.get(hour) || liveHourly.get(String(hour)) || []),
   }));
-  const maxRecipients = Math.max(1, ...summaries.map((item) => item.recipients));
   const maxWait = summaries.reduce((best, item) => item.wait > best.wait ? item : best, summaries[0] || { hour: LIVE_HOUR, wait: 0 });
   const maxDensityValue = summaries.reduce((best, item) => Math.max(best, item.density), 0);
   summaries.forEach((item) => {
@@ -776,9 +779,11 @@ function renderHourlyList() {
     if (item.density === maxDensityValue && maxDensityValue > 0) highlights.push('แออัดสูงสุด');
     if (item.wait === maxWait.wait && maxWait.wait > 0) highlights.push('รอนานสุด');
     const tags = highlights.map((label) => `<span class="tag highlight">${label}</span>`).join('');
+    // แถบ progress กว้างตามความแออัด % โดยตรง (สอดคล้องตัวเลข %)
+    const barPct = Math.max(0, Math.min(100, Number(item.density) || 0));
     el.innerHTML = `<div class="row"><div class="name">${item.label}${tags}</div>
         <div class="rq"><b>${item.recipients}</b><small>ราย</small></div></div>
-      <div class="bar"><span style="width:${Math.min(100, item.recipients / maxRecipients * 100)}%;background:${tone}"></span></div>
+      <div class="bar"><span style="width:${barPct}%;background:${tone}"></span></div>
       <div class="mini"><div>รอเฉลี่ย <b>${item.wait.toFixed(1)} นาที/ราย</b></div><div>ความแออัด <b style="color:${tone}">${item.density.toFixed(0)}%</b></div></div>`;
     el.addEventListener('click', () => selectLiveHour(item.hour, true));
     hourList.appendChild(el);
@@ -905,6 +910,19 @@ document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
   const [p, t] = VIEWS[b.dataset.view];
   camGoal = { pos: new THREE.Vector3(...p), tgt: new THREE.Vector3(...t) };
 });
+(function wireTwinDatePicker() {
+  const el = document.getElementById('twinDate');
+  if (!el) return;
+  el.value = LIVE_DATE || localToday;
+  el.max = localToday;
+  el.addEventListener('change', () => {
+    const next = el.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('twin_date', next);
+    window.location.href = url.toString();
+  });
+})();
 controls.addEventListener('start', () => { camGoal = null; dragging = true; setHover(null); tip.style.display = 'none'; });
 controls.addEventListener('end', () => { dragging = false; });
 

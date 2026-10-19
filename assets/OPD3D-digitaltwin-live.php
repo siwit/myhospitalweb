@@ -5,10 +5,12 @@ require_once __DIR__ . '/../includes/waittime/RushHourAggregator.php';
 
 $tz = new DateTimeZone('Asia/Bangkok');
 $todayBkk = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
+$explicitDate = isset($_GET['twin_date']);
 $date = $_GET['twin_date'] ?? $todayBkk;
 if (!is_string($date) || !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $parts)
     || !checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
     $date = $todayBkk;
+    $explicitDate = false;
 }
 $liveRows = [];
 $latestHour = null;
@@ -26,8 +28,8 @@ try {
     RushHourAggregator::ensureTables($conn);
     $liveRows = RushHourAggregator::fetchTwinRows($conn, $date);
 
-    // วันนี้ยังไม่มี visit / แถวว่างทั้งวัน → ใช้วันล่าสุดที่มีข้อมูลจริง
-    if ($twinDayTotal($liveRows) === 0) {
+    // ไม่ได้เลือกวันเอง และวันนี้ว่าง → ใช้วันล่าสุดที่มีข้อมูลจริง
+    if (!$explicitDate && $twinDayTotal($liveRows) === 0) {
         $fallbackDate = $conn->query("
             SELECT service_date
             FROM rush_hour
@@ -71,5 +73,5 @@ $source = file_get_contents(__DIR__ . '/OPD3D-digitaltwin2.html');
 $injection = '<script>window.__OPD_TWIN_DATE__=' . json_encode($date, JSON_UNESCAPED_UNICODE)
     . ';window.__OPD_TWIN_LATEST_HOUR__=' . json_encode($latestHour)
     . ';window.__OPD_TWIN_ROWS__=' . json_encode($liveRows, JSON_UNESCAPED_UNICODE)
-    . ';window.__OPD_TWIN_UI_VER__="lab-queue-reg-exit-v1";</script>';
+    . ';window.__OPD_TWIN_UI_VER__="twin-date-picker-v1";</script>';
 echo str_replace('</head>', $injection . '</head>', $source ?: '');
