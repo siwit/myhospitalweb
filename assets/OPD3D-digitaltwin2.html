@@ -133,7 +133,7 @@ const SIM_DAY_SIM_SEC = SIM_DAY_WALL_SEC / SIM_SCALE;
 const WALK = 55;                           // ความเร็วเดิน (px/วินาที)
 const SP = 18;                             // ระยะห่างคนในคิวจำลอง (px)
 const LIVE_SP = 8;                         // ระยะห่างคนในแถวจากข้อมูลจริง (px)
-const C_OPD = '#2563eb', C_NCD = '#f97316', C_STAFF = '#0d9488';
+const C_OPD = '#2563eb', C_NCD = '#2563eb', C_STAFF = '#ffffff'; // คนไข้น้ำเงิน / พนักงานขาว
 const toW = (x, y, h = 0) => new THREE.Vector3((x - CX) / S, h, (y - CY) / S);
 /** ชั่วโมงบริการจากเวลาจริง รายคาบ: 06–15; หลัง 15:59 จนถึงก่อน 06:00 ค้างที่ 15 */
 function serviceHourFromReal(date = new Date()) {
@@ -539,20 +539,39 @@ let simTime = 0, done = 0, losSum = 0, spawnAcc = 0, nextSpawn = 0, pid = 0;
 let simDayIndex = 0;
 let running = true, speed = 1.5, arrInterval = 4;
 const patients = [];
-
-/** เคลียร์ผู้ป่วย/คิว แล้วเริ่มรอบจำลองใหม่ (ใช้ภายในฉาก 3D) */
-function resetSimDay() {
+/** เดินได้เมื่อ pharmacy_opd_waiting ของชั่วโมงที่กำลังแสดง > 0 */
+function pharmacyOpdWaitingForHour(hour = activeLiveHour) {
+  const rows = liveHourly.get(Number(hour)) || liveHourly.get(String(hour)) || [];
+  const row = rows.find((r) => r.zone === 'pharmacy_opd');
+  if (row) return Math.max(0, Number(row.waiting || 0));
+  // fallback จาก liveRows ปัจจุบัน
+  const live = liveRows.get('pharmOPD');
+  return live ? Math.max(0, Number(live.waiting || 0)) : 0;
+}
+function isWalkSimActive() {
+  return pharmacyOpdWaitingForHour(activeLiveHour) > 0;
+}
+function clearWalkers() {
   for (const p of patients) {
     scene.remove(p.mesh);
     p.mesh.geometry?.dispose?.();
+    p.mesh.userData?.headMat?.dispose?.();
   }
   patients.length = 0;
   STATIONS.forEach((st) => {
     st.queue.length = 0;
     st.servers.forEach((sv) => { sv.p = null; sv.t = 0; });
+  });
+  spawnAcc = 0; nextSpawn = 0;
+}
+
+/** เคลียร์ผู้ป่วย/คิว แล้วเริ่มรอบจำลองใหม่ (ใช้ภายในฉาก 3D) */
+function resetSimDay() {
+  clearWalkers();
+  STATIONS.forEach((st) => {
     st.waitSum = 0; st.waitN = 0; st.served = 0; st.busyTime = 0;
   });
-  done = 0; losSum = 0; spawnAcc = 0; nextSpawn = 0; pid = 0;
+  done = 0; losSum = 0; pid = 0;
   Object.keys(EXIT_INFO).forEach((k) => { EXIT_INFO[k].in = 0; EXIT_INFO[k].out = 0; });
   simDayIndex += 1;
   simTime = 0;
@@ -600,14 +619,23 @@ function seedLiveVisuals(hour = LIVE_HOUR) {
   const rows = LIVE_ROWS.filter(row => Number(row.hour) === hour && LIVE_ZONE[row.zone]);
   const rowMap = new Map(rows.map(row => [LIVE_ZONE[row.zone], row]));
   const liveStationIds = new Set(Object.values(LIVE_ZONE));
-  // ซ่อน/แสดงผู้ให้บริการตามจำนวนผู้รอ (จุดใน rush_hour)
   STATIONS.forEach(st => {
-    if (!liveStationIds.has(st.id)) return;
     const live = rowMap.get(st.id);
     const count = live ? Math.max(0, Math.round(Number(live.waiting || 0))) : 0;
-    (st.staffMeshes || []).forEach((mesh) => { mesh.visible = count > 0; });
+    // จุดใน rush_hour: ผู้รอเป็น 0 → ซ่อนผู้ให้บริการ
+    if (liveStationIds.has(st.id)) {
+      (st.staffMeshes || []).forEach((mesh) => { mesh.visible = count > 0; });
+    }
+    // แสดงแถวคงที่ตามจำนวนผู้รอเสมอ (ใช้คู่กับคนเดิน)
+    if (count <= 0) return;
+    for (let i = 0; i < count; i++) {
+      const point = slotPos(st, i, LIVE_SP);
+      const mesh = makePerson(st.id.includes('NCD') ? matNCD : matOPD);
+      mesh.position.copy(toW(point.x, point.y));
+      scene.add(mesh);
+      liveVisuals.push(mesh);
+    }
   });
-  // ไม่วาง avatar คงที่ทับคนเดิน — ให้ใช้ simulation เดินเหมือนเดิม
 }
 applyLiveHour(LIVE_HOUR);
 function stepMove(p, dt) {
@@ -870,18 +898,38 @@ document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
 controls.addEventListener('start', () => { camGoal = null; dragging = true; setHover(null); tip.style.display = 'none'; });
 controls.addEventListener('end', () => { dragging = false; });
 
-function warmup() { for (let i = 0; i < 1200; i++) simStep(0.1); }
+function warmup() {
+  if (!isWalkSimActive()) return;
+  for (let i = 0; i < 1200; i++) simStep(0.1);
+}
 /* ================= LOOP ================= */
 warmup();
 const clock = new THREE.Clock(); let panelAcc = 0;
+let walkSimWasOn = isWalkSimActive();
+let staticQueueReady = false;
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), now = clock.elapsedTime;
-  if (running) { const sdt = dt * speed, n = Math.ceil(sdt / 0.05); for (let i = 0; i < n; i++) simStep(sdt / n); }
+  const walkOn = isWalkSimActive();
+  if (!walkOn) {
+    if (patients.length) clearWalkers();
+    // เพิ่งข้ามเข้าหลัง 17:00 หรือยังไม่ได้วางแถวคงที่ → วางแถวจากจำนวนผู้รอ
+    if (walkSimWasOn || !staticQueueReady) {
+      seedLiveVisuals(activeLiveHour);
+      staticQueueReady = true;
+    }
+  } else {
+    staticQueueReady = false;
+    if (running) {
+      const sdt = dt * speed, n = Math.ceil(sdt / 0.05);
+      for (let i = 0; i < n; i++) simStep(sdt / n);
+    }
+  }
+  walkSimWasOn = walkOn;
 
   for (const p of patients) {
     const w = toW(p.pos.x, p.pos.y);
-    p.mesh.position.set(w.x, p.moving && running ? Math.abs(Math.sin(now * 12 + p.id)) * 0.1 : 0, w.z);
+    p.mesh.position.set(w.x, p.moving && running && walkOn ? Math.abs(Math.sin(now * 12 + p.id)) * 0.1 : 0, w.z);
     const red = (p.state === 'walking' || p.state === 'queued') && simMin(simTime - p.qStart) > 15;
     if (red !== p.red) { p.red = red; p.mesh.userData.headMat.color.set(red ? '#ef4444' : '#f2c9a0'); }
   }
