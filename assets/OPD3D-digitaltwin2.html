@@ -101,7 +101,7 @@
   <div id="panel">
     <div class="head">
       <div><div class="title">🏥 OPD Times</div><div class="sub">จำลองการรับบริการในแต่ละช่วงเวลา</div></div>
-      <div class="clockBox"><div class="clock" id="clock">08:00</div><div class="sub">เวลาจำลอง</div></div>
+      <div class="clockBox"><div class="clock" id="clock">06:00</div><div class="sub">เวลาจำลอง</div></div>
     </div>
     <div class="kpis">
       <div><b id="kIn">0</b><span>ผู้รับบริการ</span></div>
@@ -122,15 +122,28 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const VIEW_W = 1260, VIEW_H = 600;
 const S = 10, CX = 363, CY = 157;          // 10 px ของแปลน = 1 หน่วย 3D
 const SIM_SCALE = 20;                      // 1 วินาทีจริง (1x) = 20 วินาทีจำลอง
+const SIM_DAY_START_H = 6;                 // คาบแรก 06:00-06:59 → แสดง 06:00
+const SIM_DAY_END_H = 15;                  // คาบสุดท้าย 15:00-15:59 → แสดง 15:00 (นอกช่วงค้างที่ 15:00)
+const SIM_DAY_WALL_SEC = (SIM_DAY_END_H - SIM_DAY_START_H) * 3600;
+const SIM_DAY_SIM_SEC = SIM_DAY_WALL_SEC / SIM_SCALE;
 const WALK = 55;                           // ความเร็วเดิน (px/วินาที)
 const SP = 13;                             // ระยะห่างคนในคิว (px)
 const C_OPD = '#2563eb', C_NCD = '#f97316', C_STAFF = '#0d9488';
 const toW = (x, y, h = 0) => new THREE.Vector3((x - CX) / S, h, (y - CY) / S);
+/** ชั่วโมงบริการจากเวลาจริง รายคาบ: 06–15; หลัง 15:59 จนถึงก่อน 06:00 ค้างที่ 15 */
+function serviceHourFromReal(date = new Date()) {
+  const h = date.getHours();
+  if (h >= SIM_DAY_START_H && h <= SIM_DAY_END_H) return h;
+  return SIM_DAY_END_H;
+}
+function serviceClockText(date = new Date()) {
+  return `${String(serviceHourFromReal(date)).padStart(2, '0')}:00`;
+}
 const LIVE_ZONE = { insurance:'reg', register:'reg', exam_opd:'examOPD', lab:'lab', exam_ncd:'examNCD', history_opd:'triOPD', pharmacy_opd:'pharmOPD', pharmacy_ncd:'pharmNCD', history_ncd:'triNCD', cashier:'cashier' };
 const LIVE_DATE = window.__OPD_TWIN_DATE__ || null;
 const LIVE_ROWS = Array.isArray(window.__OPD_TWIN_ROWS__) ? window.__OPD_TWIN_ROWS__ : [];
 const LIVE_LATEST_HOUR = Number.isInteger(window.__OPD_TWIN_LATEST_HOUR__) ? window.__OPD_TWIN_LATEST_HOUR__ : null;
-const LIVE_HOUR = LIVE_LATEST_HOUR === null ? Number(new Date().getHours()) : LIVE_LATEST_HOUR;
+const LIVE_HOUR = LIVE_LATEST_HOUR === null ? serviceHourFromReal() : LIVE_LATEST_HOUR;
 const liveRows = new Map(LIVE_ROWS.filter(row => Number(row.hour) === LIVE_HOUR && LIVE_ZONE[row.zone]).map(row => [LIVE_ZONE[row.zone], row]));
 const hasLiveData = liveRows.size > 0;
 const localToday = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
@@ -449,8 +462,27 @@ function slotPos(st, i) {
 
 /* ================= SIMULATION ================= */
 let simTime = 0, done = 0, losSum = 0, spawnAcc = 0, nextSpawn = 0, pid = 0;
+let simDayIndex = 0;
 let running = true, speed = 1.5, arrInterval = 4;
 const patients = [];
+
+/** เคลียร์ผู้ป่วย/คิว แล้วเริ่มรอบจำลองใหม่ (ใช้ภายในฉาก 3D) */
+function resetSimDay() {
+  for (const p of patients) {
+    scene.remove(p.mesh);
+    p.mesh.geometry?.dispose?.();
+  }
+  patients.length = 0;
+  STATIONS.forEach((st) => {
+    st.queue.length = 0;
+    st.servers.forEach((sv) => { sv.p = null; sv.t = 0; });
+    st.waitSum = 0; st.waitN = 0; st.served = 0; st.busyTime = 0;
+  });
+  done = 0; losSum = 0; spawnAcc = 0; nextSpawn = 0; pid = 0;
+  Object.keys(EXIT_INFO).forEach((k) => { EXIT_INFO[k].in = 0; EXIT_INFO[k].out = 0; });
+  simDayIndex += 1;
+  simTime = 0;
+}
 
 function makeRoute(type) {
   const lab = Math.random() < (type === 'NCD' ? 0.7 : 0.3);
@@ -515,6 +547,10 @@ function stepMove(p, dt) {
 }
 function simStep(dt) {
   simTime += dt;
+  if (simTime >= SIM_DAY_SIM_SEC) {
+    resetSimDay();
+    return;
+  }
   spawnAcc += dt;
   if (spawnAcc >= nextSpawn) { spawnAcc = 0; nextSpawn = arrInterval * (0.5 + Math.random()); if (patients.length < 160) spawn(); }
 
@@ -643,22 +679,27 @@ STATIONS.forEach((st) => {
 if (list) list.hidden = true;
 renderHourlyList();
 function updatePanel() {
-  const t = 8 * 3600 + simTime * SIM_SCALE;
   renderHourlyList();
+  const realServiceHour = serviceHourFromReal();
   if (liveHourPending) {
-    document.getElementById('clock').textContent = `${String(new Date().getHours()).padStart(2, '0')}:00`;
+    // นอกช่วงบริการ (เช่น หลัง 15:59) ค้างที่ 15:00; ในช่วง 06–15 แสดงต้นคาบของเวลาจริง
+    document.getElementById('clock').textContent = serviceClockText();
     document.getElementById('kIn').textContent = '-';
     document.getElementById('kDone').textContent = '-';
     document.getElementById('kLos').textContent = '-';
     return;
   }
   const selectedRows = selectedLiveHour !== null ? liveHourly.get(selectedLiveHour) : null;
-  const displayHour = selectedLiveHour !== null ? selectedLiveHour : LIVE_HOUR;
-  document.getElementById('clock').textContent = (hasLiveData || liveHourly.size > 0)
-    ? `${String(displayHour).padStart(2, '0')}:00`
-    : `${String(Math.floor(t / 3600) % 24).padStart(2, '0')}:${String(Math.floor(t / 60) % 60).padStart(2, '0')}`;
+  // ถ้าผู้ใช้เลือกชั่วโมงจากแผงข้าง → ตรึงนาฬิกาที่ชั่วโมงนั้น
+  // ไม่เช่นนั้นแสดงต้นคาบของเวลาจริง (15:50 → 15:00; หลัง 15:59 ค้าง 15:00 จนถึง 06:00)
+  if (selectedLiveHour !== null) {
+    document.getElementById('clock').textContent = `${String(selectedLiveHour).padStart(2, '0')}:00`;
+  } else {
+    document.getElementById('clock').textContent = serviceClockText();
+  }
+  const liveHourForKpi = selectedLiveHour !== null ? selectedLiveHour : realServiceHour;
   const currentSummary = (hasLiveData || liveHourly.size > 0)
-    ? hourlySummary(selectedRows || liveHourly.get(LIVE_HOUR) || [...liveRows.values()])
+    ? hourlySummary(selectedRows || liveHourly.get(liveHourForKpi) || liveHourly.get(LIVE_HOUR) || [...liveRows.values()])
     : null;
   document.getElementById('kIn').textContent = currentSummary ? currentSummary.recipients : patients.length;
   document.getElementById('kDone').textContent = currentSummary ? currentSummary.service.toFixed(1) : (done ? simMin(losSum / done).toFixed(0) : '-');
