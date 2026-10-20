@@ -138,5 +138,5 @@ $injection = '<script>window.__OPD_TWIN_DATE__=' . json_encode($date, JSON_UNESC
     . ';window.__OPD_TWIN_LATEST_HOUR__=' . json_encode($latestHour)
     . ';window.__OPD_TWIN_ROWS__=' . json_encode($liveRows, JSON_UNESCAPED_UNICODE)
     . ';window.__OPD_TWIN_DAY_STATS__=' . json_encode($dayStats, JSON_UNESCAPED_UNICODE)
-    . ';window.__OPD_TWIN_UI_VER__="date-picker-ce-v1";</script>';
+    . ';window.__OPD_TWIN_UI_VER__="date-dmy-showpicker-v1";</script>';
 echo str_replace('</head>', $injection . '</head>', $source ?: '');

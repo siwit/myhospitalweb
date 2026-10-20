@@ -44,8 +44,9 @@
   #toolbar button:hover{background:#334155}
   #toolbar label{display:flex;align-items:center;gap:4px;margin-left:6px}
   #toolbar input[type=range]{width:90px}
-  #toolbar input[type=date]{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 8px;font-family:inherit;font-size:13px;color-scheme:dark}
-  #toolbar .date-be{color:#94a3b8;font-size:12px;white-space:nowrap}
+  #toolbar .date-dmy{position:relative;display:inline-flex;align-items:center}
+  #toolbar .date-dmy-text{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 8px;font-family:inherit;font-size:13px;width:7.5em;cursor:pointer}
+  #toolbar .date-dmy-native{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;border:0;padding:0;pointer-events:none;color-scheme:dark}
   #legend{position:absolute;bottom:10px;left:10px;background:rgba(15,23,42,.82);color:#e2e8f0;font-size:12px;padding:6px 10px;border-radius:8px;display:flex;gap:12px;flex-wrap:wrap}
   #legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
   #tip{position:absolute;pointer-events:none;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:12px;padding:12px 14px;border-radius:12px;display:none;width:360px;border:1px solid #334155;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:5;line-height:1.4}
@@ -70,7 +71,7 @@
   .name{font-size:16.8px}
   .tag{font-size:12px}
   .rq b{font-size:22.8px}
-  #toolbar,#toolbar button,#toolbar label,#toolbar input[type=date],#toolbar .date-be{font-size:15.6px}
+  #toolbar,#toolbar button,#toolbar label,#toolbar .date-dmy-text{font-size:15.6px}
   #legend,#tip{font-size:16px}
   .tt-h{font-size:22px}
   .chip{font-size:14px}
@@ -93,8 +94,10 @@
       <button data-view="top">มุมบน</button>
       <button data-view="low">มุมต่ำ</button>
       <label title="เลือกวันดูย้อนหลังจาก rush_hour">วันที่
-        <input type="date" id="twinDate">
-        <span id="twinDateBe" class="date-be"></span>
+        <span class="date-dmy">
+          <input type="text" id="twinDateText" class="date-dmy-text" readonly inputmode="none" placeholder="ว/ด/ป">
+          <input type="date" id="twinDate" class="date-dmy-native" tabindex="-1" aria-hidden="true">
+        </span>
       </label>
     </div>
     <!-- <div id="legend">
@@ -1006,23 +1009,35 @@ document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
 });
 (function wireTwinDatePicker() {
   const el = document.getElementById('twinDate');
-  const beEl = document.getElementById('twinDateBe');
-  if (!el) return;
-  /** YYYY-MM-DD → วว/ดด/พ.ศ. (แสดงข้าง datepicker ที่เป็น ค.ศ.) */
-  const toBuddhistDisplay = (iso) => {
+  const textEl = document.getElementById('twinDateText');
+  if (!el || !textEl) return;
+  /** YYYY-MM-DD → ว/ด/ป (ค.ศ.) */
+  const isoToDmy = (iso) => {
     const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!m) return '';
-    return `(${m[3]}/${m[2]}/${Number(m[1]) + 543})`;
+    return `${Number(m[3])}/${Number(m[2])}/${m[1]}`;
   };
-  const syncBe = () => {
-    if (beEl) beEl.textContent = toBuddhistDisplay(el.value);
+  const syncText = () => { textEl.value = isoToDmy(el.value); };
+  const openPicker = () => {
+    try {
+      if (typeof el.showPicker === 'function') el.showPicker();
+      else { el.focus(); el.click(); }
+    } catch (_) {
+      el.focus();
+    }
   };
   el.value = LIVE_DATE || localToday;
   el.max = localToday;
-  syncBe();
-  el.addEventListener('input', syncBe);
+  syncText();
+  textEl.addEventListener('click', openPicker);
+  textEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openPicker();
+    }
+  });
   el.addEventListener('change', () => {
-    syncBe();
+    syncText();
     const next = el.value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) return;
     const url = new URL(window.location.href);
