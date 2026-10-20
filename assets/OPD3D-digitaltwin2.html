@@ -45,6 +45,7 @@
   #toolbar label{display:flex;align-items:center;gap:4px;margin-left:6px}
   #toolbar input[type=range]{width:90px}
   #toolbar input[type=date]{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 8px;font-family:inherit;font-size:13px;color-scheme:dark}
+  #toolbar .date-be{color:#94a3b8;font-size:12px;white-space:nowrap}
   #legend{position:absolute;bottom:10px;left:10px;background:rgba(15,23,42,.82);color:#e2e8f0;font-size:12px;padding:6px 10px;border-radius:8px;display:flex;gap:12px;flex-wrap:wrap}
   #legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
   #tip{position:absolute;pointer-events:none;background:rgba(15,23,42,.96);color:#e2e8f0;font-size:12px;padding:12px 14px;border-radius:12px;display:none;width:360px;border:1px solid #334155;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:5;line-height:1.4}
@@ -69,7 +70,7 @@
   .name{font-size:16.8px}
   .tag{font-size:12px}
   .rq b{font-size:22.8px}
-  #toolbar,#toolbar button,#toolbar label,#toolbar input[type=date]{font-size:15.6px}
+  #toolbar,#toolbar button,#toolbar label,#toolbar input[type=date],#toolbar .date-be{font-size:15.6px}
   #legend,#tip{font-size:16px}
   .tt-h{font-size:22px}
   .chip{font-size:14px}
@@ -91,8 +92,9 @@
       <button data-view="3d">มุม 3D</button>
       <button data-view="top">มุมบน</button>
       <button data-view="low">มุมต่ำ</button>
-      <label>วันที่
-        <input type="date" id="twinDate" title="เลือกวันดูย้อนหลังจาก rush_hour">
+      <label title="เลือกวันดูย้อนหลังจาก rush_hour">วันที่
+        <input type="date" id="twinDate">
+        <span id="twinDateBe" class="date-be"></span>
       </label>
     </div>
     <!-- <div id="legend">
@@ -139,10 +141,44 @@ const SP = 18;                             // ระยะห่างคนใ�
 const LIVE_SP = 8;                         // ระยะห่างคนในแถวจากข้อมูลจริง (px)
 const C_OPD = '#2563eb', C_NCD = '#2563eb', C_STAFF = '#ffffff'; // คนไข้น้ำเงิน / พนักงานขาว
 const toW = (x, y, h = 0) => new THREE.Vector3((x - CX) / S, h, (y - CY) / S);
-/** ชั่วโมงบริการจากเวลาจริง รายคาบ: 06–15; หลัง 15:59 จนถึงก่อน 06:00 ค้างที่ 15 */
+/** เวลา Asia/Bangkok จากนาฬิกาเครื่อง */
+function bangkokNowParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  return {
+    ymd: `${get('year')}-${get('month')}-${get('day')}`,
+    hour: Number(get('hour')),
+    minute: Number(get('minute')),
+  };
+}
+/**
+ * คาบล่าสุดที่ระบบยิงแล้วตามแผน: ยิงตอน H:00 → ส่งคาบ (H-1)
+ * 08:47 → 7 (07:00-07:59); ก่อน 07:00 ยังไม่มีคาบ
+ */
+function latestPublishedSlot(now = bangkokNowParts()) {
+  if (now.hour < 7) return null;
+  if (now.hour > 16) return SIM_DAY_END_H;
+  return Math.max(SIM_DAY_START_H, Math.min(SIM_DAY_END_H, now.hour - 1));
+}
+/** ชั่วโมงบริการที่แสดง: วันนี้ใช้คาบที่ยิงแล้ว; วันย้อนหลังใช้ข้อมูลล่าสุดของวันนั้น */
 function serviceHourFromReal(date = new Date()) {
-  const h = date.getHours();
-  if (h >= SIM_DAY_START_H && h <= SIM_DAY_END_H) return h;
+  const now = bangkokNowParts(date);
+  const isToday = !LIVE_DATE || LIVE_DATE === now.ymd;
+  if (isToday) {
+    const published = latestPublishedSlot(now);
+    return published == null ? SIM_DAY_START_H : published;
+  }
+  if (LIVE_LATEST_HOUR !== null && Number.isFinite(Number(LIVE_LATEST_HOUR))) {
+    return Math.max(SIM_DAY_START_H, Math.min(SIM_DAY_END_H, Number(LIVE_LATEST_HOUR)));
+  }
   return SIM_DAY_END_H;
 }
 function serviceClockText(date = new Date()) {
@@ -155,13 +191,13 @@ const LIVE_LATEST_HOUR = Number.isInteger(window.__OPD_TWIN_LATEST_HOUR__) ? win
 const DAY_STATS = window.__OPD_TWIN_DAY_STATS__ && typeof window.__OPD_TWIN_DAY_STATS__ === 'object'
   ? window.__OPD_TWIN_DAY_STATS__
   : null;
-// ชั่วโมงเริ่มต้นให้ตรงนาฬิกา (06–15) ไม่ใช้ max hour ใน DB ที่มักเป็น 15 เสมอ
+// ชั่วโมงเริ่มต้น = คาบล่าสุดที่ยิงแล้ว (ไม่ใช้ max hour ใน DB)
 const LIVE_HOUR = serviceHourFromReal();
 let activeLiveHour = LIVE_HOUR;
 let liveRows = new Map();
 const hasLiveData = LIVE_ROWS.some(row => LIVE_ZONE[row.zone]);
-const localToday = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
-const liveHourPending = LIVE_DATE === localToday && LIVE_LATEST_HOUR !== null && LIVE_LATEST_HOUR < new Date().getHours();
+const localToday = bangkokNowParts().ymd;
+const liveHourPending = LIVE_DATE === localToday && LIVE_LATEST_HOUR !== null && LIVE_LATEST_HOUR < (latestPublishedSlot() ?? -1);
 let selectedLiveHour = null;
 let selectedLiveTimer = null;
 const liveHourly = new Map();
@@ -764,6 +800,7 @@ const HOUR_SLOTS = {
 const list = document.getElementById('list');
 const hourList = document.getElementById('hourList');
 let hourlyListRendered = false;
+let renderedHourKey = '';
 function hourlySummary(rows) {
   const waiting = rows.reduce((sum, row) => sum + Number(row.waiting || 0), 0);
   const capacity = rows.reduce((sum, row) => sum + Number(row.capacity || 0), 0);
@@ -789,28 +826,41 @@ function densityColorOf(density) {
   return '#dc2626';
 }
 function buildHourSlots() {
-  const nowH = new Date().getHours();
-  const dataHours = [...liveHourly.keys()].map(Number).filter((h) => Number.isFinite(h));
-  const latestFromData = dataHours.length ? Math.max(...dataHours) : null;
-  let latestHour;
-  if (LIVE_LATEST_HOUR !== null && Number.isFinite(Number(LIVE_LATEST_HOUR))) {
-    latestHour = Number(LIVE_LATEST_HOUR);
-  } else if (latestFromData !== null) {
-    latestHour = Math.max(latestFromData, Number(LIVE_HOUR) || 0);
+  const now = bangkokNowParts();
+  const dataHours = [...liveHourly.keys()]
+    .map(Number)
+    .filter((h) => Number.isFinite(h) && h >= SIM_DAY_START_H && h <= SIM_DAY_END_H)
+    .sort((a, b) => a - b);
+  const isToday = !LIVE_DATE || LIVE_DATE === now.ymd;
+
+  let endHour;
+  if (isToday) {
+    // วันนี้: โชว์ถึงคาบที่ยิงแล้วเท่านั้น (08:47 → ถึง 07)
+    const published = latestPublishedSlot(now);
+    if (published == null) return [];
+    endHour = published;
+  } else if (LIVE_LATEST_HOUR !== null && Number.isFinite(Number(LIVE_LATEST_HOUR))) {
+    endHour = Math.max(SIM_DAY_START_H, Math.min(SIM_DAY_END_H, Number(LIVE_LATEST_HOUR)));
+  } else if (dataHours.length) {
+    endHour = Math.max(...dataHours);
   } else {
-    latestHour = nowH;
+    endHour = SIM_DAY_END_H;
   }
-  const endHour = Math.max(6, Math.min(15, latestHour));
-  return Object.keys(HOUR_SLOTS).map(Number).filter((h) => h >= 6 && h <= endHour);
+
+  // โชว์เฉพาะคาบที่มีข้อมูลและไม่เกิน endHour — ยิงขึ้นมาทีละคาบค่อยโผล่
+  return dataHours.filter((h) => h <= endHour);
 }
 function renderHourlyList() {
   // side panel: ช่วงเวลา + จำนวนผู้รับบริการต่อชั่วโมง (ไม่ใช่รายจุดบริการ)
-  if (hourlyListRendered || !hourList) return;
+  if (!hourList) return;
+  const hours = buildHourSlots();
+  const hourKey = hours.join(',');
+  if (hourlyListRendered && hourKey === renderedHourKey) return;
   hourlyListRendered = true;
+  renderedHourKey = hourKey;
   hourList.hidden = false;
   if (list) list.hidden = true;
   hourList.replaceChildren();
-  const hours = buildHourSlots();
   const summaries = hours.map((hour) => ({
     hour,
     label: HOUR_SLOTS[hour] || `${String(hour).padStart(2, '0')}:00-${String(hour).padStart(2, '0')}:59 น.`,
@@ -956,10 +1006,23 @@ document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
 });
 (function wireTwinDatePicker() {
   const el = document.getElementById('twinDate');
+  const beEl = document.getElementById('twinDateBe');
   if (!el) return;
+  /** YYYY-MM-DD → วว/ดด/พ.ศ. (แสดงข้าง datepicker ที่เป็น ค.ศ.) */
+  const toBuddhistDisplay = (iso) => {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    return `(${m[3]}/${m[2]}/${Number(m[1]) + 543})`;
+  };
+  const syncBe = () => {
+    if (beEl) beEl.textContent = toBuddhistDisplay(el.value);
+  };
   el.value = LIVE_DATE || localToday;
   el.max = localToday;
+  syncBe();
+  el.addEventListener('input', syncBe);
   el.addEventListener('change', () => {
+    syncBe();
     const next = el.value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) return;
     const url = new URL(window.location.href);
