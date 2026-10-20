@@ -113,8 +113,8 @@
     </div>
     <div class="kpis">
       <div><b id="kIn">0</b><span>ยอดผู้ป่วย</span></div>
-      <div><b id="kDone">-</b><span>รอเฉลี่ย นาที/ราย</span></div>
-      <div><b id="kLos">0%</b><span>ความแออัด %</span></div>
+      <div><b id="kDone">-</b><span>รอเฉลี่ย(นาที/ราย)</span></div>
+      <div><b id="kLos">0%</b><span>ความแออัด%</span></div>
     </div>
     <div class="sec">ช่วงเวลารายชั่วโมง</div>
     <div id="hourList"></div>
@@ -152,6 +152,9 @@ const LIVE_ZONE = { insurance:'reg', register:'reg', exam_opd:'examOPD', lab:'la
 const LIVE_DATE = window.__OPD_TWIN_DATE__ || null;
 const LIVE_ROWS = Array.isArray(window.__OPD_TWIN_ROWS__) ? window.__OPD_TWIN_ROWS__ : [];
 const LIVE_LATEST_HOUR = Number.isInteger(window.__OPD_TWIN_LATEST_HOUR__) ? window.__OPD_TWIN_LATEST_HOUR__ : null;
+const DAY_STATS = window.__OPD_TWIN_DAY_STATS__ && typeof window.__OPD_TWIN_DAY_STATS__ === 'object'
+  ? window.__OPD_TWIN_DAY_STATS__
+  : null;
 // ชั่วโมงเริ่มต้นให้ตรงนาฬิกา (06–15) ไม่ใช้ max hour ใน DB ที่มักเป็น 15 เสมอ
 const LIVE_HOUR = serviceHourFromReal();
 let activeLiveHour = LIVE_HOUR;
@@ -191,11 +194,63 @@ function applyLiveHour(hour) {
     });
   }
 }
-/** เลือกช่วงเวลาจาก progress → อัปเดตนาฬิกา KPI ป้าย และฉาก */
+/** การ์ด KPI สรุปทั้งวันตามวันที่เลือก (ไม่ผูก progress รายชั่วโมง) */
+function dayKpiSummary() {
+  if (DAY_STATS) {
+    return {
+      recipients: Number(DAY_STATS.recipients) || 0,
+      wait: Number(DAY_STATS.wait) || 0,
+      density: Number(DAY_STATS.density) || 0,
+      capacity: Number(DAY_STATS.capacity) || 0,
+    };
+  }
+  // fallback ฝั่ง client ถ้าไม่ได้ฉีด DAY_STATS
+  const allRows = LIVE_ROWS.filter((row) => LIVE_ZONE[row.zone]);
+  if (!allRows.length) return { recipients: 0, wait: 0, density: 0, capacity: 0 };
+  const byHour = new Map();
+  let waitSum = 0;
+  let waitWeight = 0;
+  let maxRecipients = 0;
+  let capacity = 0;
+  const capSeen = new Set();
+  allRows.forEach((row) => {
+    const hour = Number(row.hour);
+    const waiting = Number(row.waiting || 0);
+    const avgWait = Number(row.avg_wait || 0);
+    if (waiting > 0) {
+      waitSum += avgWait * waiting;
+      waitWeight += waiting;
+    }
+    if (!byHour.has(hour)) byHour.set(hour, 0);
+    byHour.set(hour, byHour.get(hour) + waiting);
+    const tr = Number(row.total_recipients);
+    if (Number.isFinite(tr)) maxRecipients = Math.max(maxRecipients, tr);
+    if (!capSeen.has(row.zone)) {
+      capSeen.add(row.zone);
+      capacity += Number(row.capacity || 0);
+    }
+  });
+  const active = [...byHour.values()].filter((n) => n > 0);
+  const avgWaiting = active.length ? active.reduce((a, b) => a + b, 0) / active.length : 0;
+  return {
+    recipients: maxRecipients,
+    wait: waitWeight ? waitSum / waitWeight : 0,
+    density: capacity ? avgWaiting / capacity * 100 : 0,
+    capacity,
+  };
+}
+function applyDayKpis() {
+  const summary = dayKpiSummary();
+  const kIn = document.getElementById('kIn');
+  const kDone = document.getElementById('kDone');
+  const kLos = document.getElementById('kLos');
+  if (kIn) kIn.textContent = summary.recipients;
+  if (kDone) kDone.textContent = summary.wait.toFixed(1);
+  if (kLos) kLos.textContent = summary.density.toFixed(0) + '%';
+}
+/** เลือกช่วงเวลาจาก progress → อัปเดตนาฬิกา ป้าย และฉาก (การ์ด KPI คงสรุปรายวัน) */
 function selectLiveHour(hour, lock = true) {
   const h = Number(hour);
-  const rows = liveHourly.get(h) || liveHourly.get(String(h)) || [];
-  const summary = hourlySummary(rows);
   if (lock) {
     selectedLiveHour = h;
     if (selectedLiveTimer) clearTimeout(selectedLiveTimer);
@@ -208,13 +263,8 @@ function selectLiveHour(hour, lock = true) {
   }
   applyLiveHour(h);
   const clockEl = document.getElementById('clock');
-  const kIn = document.getElementById('kIn');
-  const kDone = document.getElementById('kDone');
-  const kLos = document.getElementById('kLos');
   if (clockEl) clockEl.textContent = lock ? `${String(h).padStart(2, '0')}:00` : serviceClockText();
-  if (kIn) kIn.textContent = summary.recipients;
-  if (kDone) kDone.textContent = summary.wait.toFixed(1);
-  if (kLos) kLos.textContent = summary.density.toFixed(0) + '%';
+  applyDayKpis();
 }
 const liveWaitingTotal = () => [...liveRows.values()].reduce((sum, row) => sum + Number(row.waiting || 0), 0);
 
@@ -808,13 +858,7 @@ function updatePanel() {
   } else {
     document.getElementById('clock').textContent = serviceClockText();
   }
-  const selectedRows = liveHourly.get(liveHourForKpi) || liveHourly.get(String(liveHourForKpi)) || null;
-  const currentSummary = (hasLiveData || liveHourly.size > 0)
-    ? hourlySummary(selectedRows || liveHourly.get(LIVE_HOUR) || [...liveRows.values()])
-    : null;
-  document.getElementById('kIn').textContent = currentSummary ? currentSummary.recipients : patients.length;
-  document.getElementById('kDone').textContent = currentSummary ? currentSummary.wait.toFixed(1) : (done ? simMin(losSum / done).toFixed(0) : '-');
-  document.getElementById('kLos').textContent = currentSummary ? currentSummary.density.toFixed(0) + '%' : Math.min(100, Math.round((patients.length / 150) * 100)) + '%';
+  applyDayKpis();
   if (hasLiveData || liveHourly.size > 0) return;
   STATIONS.forEach(st => {
     const live = liveRows.get(st.id), n = live ? Number(live.waiting || 0) : st.queue.length, busy = st.servers.filter(s => s.p).length;

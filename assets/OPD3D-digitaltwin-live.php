@@ -64,6 +64,70 @@ try {
 } catch (Throwable $error) {
     error_log('OPD live twin: unable to read rush_hour/hourly data: ' . $error->getMessage());
 }
+
+/** สรุปการ์ด KPI ทั้งวัน: ยอดไม่ซ้ำ / รอเฉลี่ย / ความแออัดจาก capacity รวม */
+$dayStats = [
+    'recipients' => 0,
+    'wait' => 0.0,
+    'density' => 0.0,
+    'capacity' => 0,
+];
+try {
+    RushHourAggregator::ensureTables($conn);
+    $capacities = RushHourAggregator::loadCapacities($conn);
+    $capacityTotal = 0;
+    foreach (RushHourAggregator::ZONE_KEYS as $zone) {
+        $capacityTotal += RushHourAggregator::capacityFor($capacities, $zone);
+    }
+    $dayStats['capacity'] = $capacityTotal;
+
+    // ยอดผู้ป่วยไม่ซ้ำทั้งวัน จาก waittime_visit_anon
+    try {
+        $uniqStmt = $conn->prepare('SELECT COUNT(*) FROM waittime_visit_anon WHERE vstdate = ?');
+        $uniqStmt->execute([$date]);
+        $dayStats['recipients'] = (int) $uniqStmt->fetchColumn();
+    } catch (Throwable $uniqError) {
+        error_log('OPD live twin: unique recipients query failed: ' . $uniqError->getMessage());
+    }
+
+    $waitWeight = 0.0;
+    $waitSum = 0.0;
+    $hourWaiting = [];
+    $hourRecipients = [];
+    foreach ($liveRows as $row) {
+        $hour = (int) ($row['hour'] ?? -1);
+        $waiting = (int) ($row['waiting'] ?? 0);
+        $avgWait = (float) ($row['avg_wait'] ?? 0);
+        if ($waiting > 0 && $avgWait >= 0) {
+            $waitSum += $avgWait * $waiting;
+            $waitWeight += $waiting;
+        }
+        if ($hour >= 0) {
+            $hourWaiting[$hour] = ($hourWaiting[$hour] ?? 0) + $waiting;
+            $tr = $row['total_recipients'] ?? null;
+            if ($tr !== null && is_numeric($tr)) {
+                $hourRecipients[$hour] = max($hourRecipients[$hour] ?? 0, (int) $tr);
+            }
+        }
+    }
+    $dayStats['wait'] = $waitWeight > 0 ? round($waitSum / $waitWeight, 1) : 0.0;
+
+    $activeHourWaitings = array_values(array_filter($hourWaiting, static fn(int $n): bool => $n > 0));
+    $avgHourWaiting = $activeHourWaitings
+        ? array_sum($activeHourWaitings) / count($activeHourWaitings)
+        : 0.0;
+    $dayStats['density'] = $capacityTotal > 0
+        ? round($avgHourWaiting / $capacityTotal * 100, 1)
+        : 0.0;
+
+    // ถ้ายังไม่มี anon ของวันนั้น แต่มี rush_hour → ใช้ยอดสูงสุดรายชั่วโมงเป็นค่าสำรอง
+    if ($dayStats['recipients'] === 0 && $hourRecipients) {
+        $dayStats['recipients'] = max($hourRecipients);
+    }
+} catch (Throwable $dayError) {
+    error_log('OPD live twin: day stats failed: ' . $dayError->getMessage());
+}
+
 header('Content-Type: text/html; charset=UTF-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -73,5 +137,6 @@ $source = file_get_contents(__DIR__ . '/OPD3D-digitaltwin2.html');
 $injection = '<script>window.__OPD_TWIN_DATE__=' . json_encode($date, JSON_UNESCAPED_UNICODE)
     . ';window.__OPD_TWIN_LATEST_HOUR__=' . json_encode($latestHour)
     . ';window.__OPD_TWIN_ROWS__=' . json_encode($liveRows, JSON_UNESCAPED_UNICODE)
-    . ';window.__OPD_TWIN_UI_VER__="twin-date-picker-v1";</script>';
+    . ';window.__OPD_TWIN_DAY_STATS__=' . json_encode($dayStats, JSON_UNESCAPED_UNICODE)
+    . ';window.__OPD_TWIN_UI_VER__="day-kpi-cards-v1";</script>';
 echo str_replace('</head>', $injection . '</head>', $source ?: '');
