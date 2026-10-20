@@ -167,13 +167,29 @@ try {
     $dayStats['wait_mode'] = $journeyWait !== null ? 'journey_c' : 'zone_fallback';
     $dayStats['wait_ref_hour'] = $refHour;
 
-    $activeHourWaitings = array_values(array_filter($hourWaiting, static fn(int $n): bool => $n > 0));
-    $avgHourWaiting = $activeHourWaitings
-        ? array_sum($activeHourWaitings) / count($activeHourWaitings)
+    // ความแออัดการ์ด = เฉลี่ย % ความแออัดของแต่ละคาบ (สูตรเดียวกับ progress)
+    // วันนี้ใช้ถึงคาบที่ยิงแล้ว; วันย้อนหลังใช้คาบที่มีข้อมูล
+    $densityEndHour = null;
+    if ($isToday) {
+        $densityEndHour = $refHour;
+    } elseif ($latestHour !== null) {
+        $densityEndHour = $latestHour;
+    }
+    $hourDensities = [];
+    if ($capacityTotal > 0 && $densityEndHour !== null) {
+        foreach ($hourWaiting as $hour => $waitingSum) {
+            $h = (int) $hour;
+            if ($h < 6 || $h > 15 || $h > $densityEndHour) {
+                continue;
+            }
+            $hourDensities[] = ($waitingSum / $capacityTotal) * 100;
+        }
+    }
+    $dayStats['density'] = $hourDensities
+        ? round(array_sum($hourDensities) / count($hourDensities), 1)
         : 0.0;
-    $dayStats['density'] = $capacityTotal > 0
-        ? round($avgHourWaiting / $capacityTotal * 100, 1)
-        : 0.0;
+    $dayStats['density_mode'] = 'avg_progress_slots';
+    $dayStats['density_slots'] = count($hourDensities);
 
     // ถ้ายังไม่มี anon ของวันนั้น แต่มี rush_hour → ใช้ยอดสูงสุดรายชั่วโมงเป็นค่าสำรอง
     if ($dayStats['recipients'] === 0 && $hourRecipients) {
@@ -193,5 +209,5 @@ $injection = '<script>window.__OPD_TWIN_DATE__=' . json_encode($date, JSON_UNESC
     . ';window.__OPD_TWIN_LATEST_HOUR__=' . json_encode($latestHour)
     . ';window.__OPD_TWIN_ROWS__=' . json_encode($liveRows, JSON_UNESCAPED_UNICODE)
     . ';window.__OPD_TWIN_DAY_STATS__=' . json_encode($dayStats, JSON_UNESCAPED_UNICODE)
-    . ';window.__OPD_TWIN_UI_VER__="wait-journey-c-v1";</script>';
+    . ';window.__OPD_TWIN_UI_VER__="room-tip-no-waiting-count-v1";</script>';
 echo str_replace('</head>', $injection . '</head>', $source ?: '');

@@ -129,14 +129,23 @@ $activeBanners = $conn->query("SELECT * FROM banners WHERE is_active = 1 ORDER B
 
 
 <!-- Hero Section -->
-<section class="card text-center" style="background: linear-gradient(135deg, var(--primary-color), var(--accent-color)); color: white; display:flex; align-items:center; gap:1.5rem;">
+<!-- <section class="card text-center" style="background: linear-gradient(135deg, var(--primary-color), var(--accent-color)); color: white; display:flex; align-items:center; gap:1.5rem;">
     <div style="flex-shrink:0;">
         <img src="assets/images/HA.png" alt="HA Logo" style="height:130px; width:auto; object-fit:contain;">
     </div>
-    <div style="text-align:center; width:100%;">
-        <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">ยินดีต้อนรับสู่โรงพยาบาลเฉลิมพระเกียรติสมเด็จย่า 100 ปี</h1>
+     <div style="text-align:center; width:100%;">
+        <h1 style="font-size: 2.0rem; margin-bottom: 1rem;">ยินดีต้อนรับสู่โรงพยาบาลเฉลิมพระเกียรติสมเด็จย่า 100 ปี</h1>
         <p style="font-size: 1.2rem;">โรงพยาบาลชุมชนมาตรฐาน ประชาชนสุขภาพดี เจ้าหน้าที่มีความสุข</p>
-    </div>
+    </div> 
+</section> -->
+<section class="card text-center" style="background: linear-gradient(135deg, var(--primary-color), var(--accent-color)); color: white; display:flex; align-items:center; gap:1.5rem;">
+    <!-- <div style="flex-shrink:0;">
+        <img src="assets/images/HA.png" alt="HA Logo" style="height:130px; width:auto; object-fit:contain;">
+    </div> -->
+     <div style="text-align:center; width:100%;">
+        <!-- <h1 style="font-size: 2.0rem; margin-bottom: 1rem;">ยินดีต้อนรับสู่โรงพยาบาลเฉลิมพระเกียรติสมเด็จย่า 100 ปี</h1> -->
+        <p style="font-size: 2.0rem;">แบบจำลองปริมาณผู้ป่วยที่รับบริการในอาคารบริการผู้ป่วยนอก </p>
+    </div> 
 </section>
 
 <?php include __DIR__ . '/includes/opd_twin_reference.php'; ?>

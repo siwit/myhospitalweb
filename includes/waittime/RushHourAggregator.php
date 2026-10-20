@@ -481,8 +481,9 @@ class RushHourAggregator
             $hour = (int) $wide['hour_slot'];
             foreach (self::ZONE_KEYS as $zone) {
                 $waiting = (int) ($wide["{$zone}_waiting"] ?? 0);
-                $waitAvg = self::floatOrNull($wide["{$zone}_avg_minutes"] ?? null) ?? 0.0;
-                $svcAvg = self::floatOrNull($wide["{$zone}_service_minutes"] ?? null) ?? 0.0;
+                // คง null เมื่อไม่มีค่าเฉลี่ย — tooltip แสดง "-" แทน 0.0 ปลอม
+                $waitAvg = self::floatOrNull($wide["{$zone}_avg_minutes"] ?? null);
+                $svcAvg = self::floatOrNull($wide["{$zone}_service_minutes"] ?? null);
                 $rows[] = [
                     'hour' => $hour,
                     'zone' => $zone,

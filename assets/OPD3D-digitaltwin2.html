@@ -233,35 +233,43 @@ function applyLiveHour(hour) {
     });
   }
 }
+/** เฉลี่ย % ความแออัดของคาบที่โชว์ใน progress (สูตรเดียวกับแถบรายชั่วโมง) */
+function avgProgressDensity() {
+  const hours = typeof buildHourSlots === 'function' ? buildHourSlots() : [];
+  if (!hours.length) return null;
+  const dens = hours.map((hour) => {
+    const rows = liveHourly.get(hour) || liveHourly.get(String(hour)) || [];
+    return hourlySummary(rows).density;
+  });
+  if (!dens.length) return null;
+  return dens.reduce((a, b) => a + b, 0) / dens.length;
+}
 /** การ์ด KPI สรุปทั้งวันตามวันที่เลือก (ไม่ผูก progress รายชั่วโมง) */
 function dayKpiSummary() {
+  const progressDensity = avgProgressDensity();
   if (DAY_STATS) {
     return {
       recipients: Number(DAY_STATS.recipients) || 0,
       wait: Number(DAY_STATS.wait) || 0,
-      density: Number(DAY_STATS.density) || 0,
+      density: progressDensity != null ? progressDensity : (Number(DAY_STATS.density) || 0),
       capacity: Number(DAY_STATS.capacity) || 0,
     };
   }
   // fallback ฝั่ง client ถ้าไม่ได้ฉีด DAY_STATS
   const allRows = LIVE_ROWS.filter((row) => LIVE_ZONE[row.zone]);
   if (!allRows.length) return { recipients: 0, wait: 0, density: 0, capacity: 0 };
-  const byHour = new Map();
   let waitSum = 0;
   let waitWeight = 0;
   let maxRecipients = 0;
   let capacity = 0;
   const capSeen = new Set();
   allRows.forEach((row) => {
-    const hour = Number(row.hour);
     const waiting = Number(row.waiting || 0);
     const avgWait = Number(row.avg_wait || 0);
     if (waiting > 0) {
       waitSum += avgWait * waiting;
       waitWeight += waiting;
     }
-    if (!byHour.has(hour)) byHour.set(hour, 0);
-    byHour.set(hour, byHour.get(hour) + waiting);
     const tr = Number(row.total_recipients);
     if (Number.isFinite(tr)) maxRecipients = Math.max(maxRecipients, tr);
     if (!capSeen.has(row.zone)) {
@@ -269,12 +277,10 @@ function dayKpiSummary() {
       capacity += Number(row.capacity || 0);
     }
   });
-  const active = [...byHour.values()].filter((n) => n > 0);
-  const avgWaiting = active.length ? active.reduce((a, b) => a + b, 0) / active.length : 0;
   return {
     recipients: maxRecipients,
     wait: waitWeight ? waitSum / waitWeight : 0,
-    density: capacity ? avgWaiting / capacity * 100 : 0,
+    density: progressDensity != null ? progressDensity : 0,
     capacity,
   };
 }
@@ -812,9 +818,15 @@ function hourlySummary(rows) {
   const service = weight
     ? rows.reduce((sum, row) => sum + Number(row.avg_service || 0) * Number(row.served || row.waiting || 0), 0) / weight
     : 0;
-  const wait = weight
-    ? rows.reduce((sum, row) => sum + Number(row.avg_wait || 0) * Number(row.served || row.waiting || 0), 0) / weight
-    : 0;
+  // รอเฉลี่ยรายชั่วโมง = สูตร C (avg_journey) ถ้ามี; ไม่เช่นนั้น fallback ถัวเฉลี่ยรายจุด
+  const fromJourney = rows
+    .map((row) => Number(row.avg_journey))
+    .find((n) => Number.isFinite(n) && n >= 0);
+  const wait = fromJourney != null
+    ? fromJourney
+    : (weight
+      ? rows.reduce((sum, row) => sum + Number(row.avg_wait || 0) * Number(row.served || row.waiting || 0), 0) / weight
+      : 0);
   // ราย = total_recipients จาก rush_hour (ไม่ซ้ำ) ถ้ามี; ไม่เช่นนั้นใช้ waiting
   const fromTotal = rows.map((row) => Number(row.total_recipients)).find((n) => Number.isFinite(n) && n >= 0);
   const recipients = fromTotal != null ? fromTotal : (served > 0 ? served : waiting);
@@ -880,14 +892,14 @@ function renderHourlyList() {
     el.style.setProperty('--c', tone);
     const highlights = [];
     if (item.density === maxDensityValue && maxDensityValue > 0) highlights.push('แออัดสูงสุด');
-    if (item.wait === maxWait.wait && maxWait.wait > 0) highlights.push('รอนานสุด');
+    // ซ่อนป้ายรอนานสุดชั่วคราว (รอเฉลี่ยรายคาบยังไม่โชว์)
     const tags = highlights.map((label) => `<span class="tag highlight">${label}</span>`).join('');
     // แถบ progress กว้างตามความแออัด % โดยตรง (สอดคล้องตัวเลข %)
     const barPct = Math.max(0, Math.min(100, Number(item.density) || 0));
     el.innerHTML = `<div class="row"><div class="name">${item.label}${tags}</div>
         <div class="rq"><b>${item.recipients}</b><small>ราย</small></div></div>
       <div class="bar"><span style="width:${barPct}%;background:${tone}"></span></div>
-      <div class="mini"><div>รอเฉลี่ย <b>${item.wait.toFixed(1)} นาที/ราย</b></div><div>ความแออัด <b style="color:${tone}">${item.density.toFixed(0)}%</b></div></div>`;
+      <div class="mini"><div>ความแออัด <b style="color:${tone}">${item.density.toFixed(0)}%</b></div></div>`;
     el.addEventListener('click', () => selectLiveHour(item.hour, true));
     hourList.appendChild(el);
   });
@@ -921,24 +933,38 @@ function updatePanel() {
     st.ui.bar.style.width = Math.min(100, n / 50 * 100) + '%';
     st.ui.bar.style.background = tone.bar;
     st.ui.m1.textContent = `${busy}/${st.servers.length}`;
-    st.ui.m2.textContent = live ? live.avg_wait.toFixed(1) + ' น. · DB' : (st.waitN ? simMin(st.waitSum / st.waitN).toFixed(1) + ' น.' : '-');
+    st.ui.m2.textContent = live ? fmtTipMinutes(live.avg_wait) + ' น. · DB' : (st.waitN ? simMin(st.waitSum / st.waitN).toFixed(1) + ' น.' : '-');
     st.ui.m3.textContent = live ? live.served : st.served;
   });
 }
 
 /* ================= TOOLTIP (ป้ายชื่อห้อง) ================= */
+function fmtTipMinutes(v) {
+  if (v == null || v === '') return '-';
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return '-';
+  return n.toFixed(1);
+}
 function stationTip(st) {
   const live = liveRows.get(st.id);
+
+  // LAB: ไม่คำนวณ/ไม่แสดงรอเฉลี่ย·รับบริการเฉลี่ยแบบจุดอื่น (จำนวนรออยู่ที่ป้ายแล้ว)
+  if (st.id === 'lab') {
+    return `<div class="tt-h"><i style="background:${st.color}"></i><b>${st.name}</b></div>
+      <div class="tt-k" style="margin-bottom:0">จุดเจาะเลือด · ไม่แสดงรอ/รับบริการเฉลี่ยแบบห้องอื่น</div>`;
+  }
+
+  // ห้องอื่น: ใช้ค่าเฉลี่ยจาก rush_hour ของคาบที่กำลังดู (จำนวนรออยู่ที่ป้ายแล้ว)
   const avgW = live
-    ? Number(live.avg_wait || 0).toFixed(1)
+    ? fmtTipMinutes(live.avg_wait)
     : (st.waitN ? simMin(st.waitSum / st.waitN).toFixed(1) : '-');
   const serviceMean = live
-    ? Number(live.avg_service || 0).toFixed(1)
+    ? fmtTipMinutes(live.avg_service)
     : simMin(st.mean).toFixed(1);
   return `<div class="tt-h"><i style="background:${st.color}"></i><b>${st.name}</b></div>
     <div class="tt-g" style="margin-bottom:0;grid-template-columns:1fr 1fr">
       <div><b>${avgW}</b><span>รอคอยเฉลี่ย<br>(นาที/ราย)</span></div>
-      <div><b>${serviceMean}</b><span>เวลารับบริการเฉลี่ย<br>(นาที/ราย)</span></div>
+      <div><b>${serviceMean}</b><span>รับบริการเฉลี่ย<br>(นาที/ราย)</span></div>
     </div>`;
 }
 function buildTip(info) {
