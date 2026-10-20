@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS rush_hour (
   lab_service_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'เวลารับบริการเฉลี่ย นาที/ราย',
 
   avg_total_service_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'เวลารับบริการทั้งหมดเฉลี่ยต่อราย (total_opd)',
+  avg_journey_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'รอเฉลี่ยสูตร C: จบ=000→999 / ยังไม่จบ=elapsed ถึงสิ้นชั่วโมง',
   total_recipients INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'จำนวนผู้รับบริการทั้งหมดในโซน cur_dep ที่กำหนด',
 
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -66,6 +66,7 @@ foreach ($zoneKeys as $zone) {
     $cols[] = "{$zone}_service_minutes";
 }
 $cols[] = 'avg_total_service_minutes';
+$cols[] = 'avg_journey_minutes';
 $cols[] = 'total_recipients';
 
 // ensure table exists (schema file)
@@ -92,6 +93,13 @@ if (is_readable($sqlFile)) {
             // exists
         }
     }
+}
+
+// ตารางเดิมที่สร้างก่อนมี avg_journey_minutes
+try {
+    $conn->exec("ALTER TABLE rush_hour ADD COLUMN avg_journey_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'รอเฉลี่ยสูตร C: จบ=000→999 / ยังไม่จบ=elapsed ถึงสิ้นชั่วโมง' AFTER avg_total_service_minutes");
+} catch (PDOException $e) {
+    // column exists
 }
 
 $placeholders = array_map(static fn ($c) => ':' . $c, $cols);
@@ -146,6 +154,7 @@ try {
             'hour_slot' => $hourSlot,
             'slot_label' => $row['slot_label'] ?? rhi_slot_label($hourSlot),
             'avg_total_service_minutes' => rhi_float_or_null($row['avg_total_service_minutes'] ?? null),
+            'avg_journey_minutes' => rhi_float_or_null($row['avg_journey_minutes'] ?? null),
             'total_recipients' => max(0, (int) ($row['total_recipients'] ?? 0)),
         ];
         foreach ($zoneKeys as $zone) {

@@ -110,7 +110,62 @@ try {
             }
         }
     }
-    $dayStats['wait'] = $waitWeight > 0 ? round($waitSum / $waitWeight, 1) : 0.0;
+
+    // สูตร C: ใช้ avg_journey_minutes ณ สิ้นชั่วโมงอ้างอิง (คาบที่ยิงแล้ว / วันย้อนหลัง = ชั่วโมงล่าสุด)
+    $refHour = null;
+    $nowBkk = new DateTimeImmutable('now', $tz);
+    $isToday = ($date === $todayBkk);
+    if ($isToday) {
+        $wallHour = (int) $nowBkk->format('G');
+        if ($wallHour >= 7 && $wallHour <= 16) {
+            $refHour = max(6, min(15, $wallHour - 1));
+        } elseif ($wallHour > 16) {
+            $refHour = 15;
+        }
+    } else {
+        $refHour = $latestHour;
+    }
+    $journeyWait = null;
+    if ($refHour !== null) {
+        try {
+            $jStmt = $conn->prepare('
+                SELECT avg_journey_minutes
+                FROM rush_hour
+                WHERE service_date = ? AND hour_slot = ?
+                LIMIT 1
+            ');
+            $jStmt->execute([$date, $refHour]);
+            $jVal = $jStmt->fetchColumn();
+            if ($jVal !== false && $jVal !== null && $jVal !== '') {
+                $journeyWait = (float) $jVal;
+            }
+        } catch (Throwable $journeyError) {
+            error_log('OPD live twin: journey wait query failed: ' . $journeyError->getMessage());
+        }
+    }
+    if ($journeyWait === null && $refHour !== null && $latestHour !== null && $refHour !== $latestHour) {
+        // ยังไม่มียิงคาบอ้างอิง → ใช้ชั่วโมงล่าสุดที่มีใน DB
+        try {
+            $jStmt = $conn->prepare('
+                SELECT avg_journey_minutes
+                FROM rush_hour
+                WHERE service_date = ? AND hour_slot = ?
+                LIMIT 1
+            ');
+            $jStmt->execute([$date, $latestHour]);
+            $jVal = $jStmt->fetchColumn();
+            if ($jVal !== false && $jVal !== null && $jVal !== '') {
+                $journeyWait = (float) $jVal;
+            }
+        } catch (Throwable $journeyError) {
+            // ignore
+        }
+    }
+    $dayStats['wait'] = $journeyWait !== null
+        ? round($journeyWait, 1)
+        : ($waitWeight > 0 ? round($waitSum / $waitWeight, 1) : 0.0);
+    $dayStats['wait_mode'] = $journeyWait !== null ? 'journey_c' : 'zone_fallback';
+    $dayStats['wait_ref_hour'] = $refHour;
 
     $activeHourWaitings = array_values(array_filter($hourWaiting, static fn(int $n): bool => $n > 0));
     $avgHourWaiting = $activeHourWaitings
@@ -138,5 +193,5 @@ $injection = '<script>window.__OPD_TWIN_DATE__=' . json_encode($date, JSON_UNESC
     . ';window.__OPD_TWIN_LATEST_HOUR__=' . json_encode($latestHour)
     . ';window.__OPD_TWIN_ROWS__=' . json_encode($liveRows, JSON_UNESCAPED_UNICODE)
     . ';window.__OPD_TWIN_DAY_STATS__=' . json_encode($dayStats, JSON_UNESCAPED_UNICODE)
-    . ';window.__OPD_TWIN_UI_VER__="date-dmy-showpicker-v1";</script>';
+    . ';window.__OPD_TWIN_UI_VER__="wait-journey-c-v1";</script>';
 echo str_replace('</head>', $injection . '</head>', $source ?: '');

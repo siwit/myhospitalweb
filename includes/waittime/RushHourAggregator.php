@@ -160,6 +160,7 @@ class RushHourAggregator
             "ALTER TABLE rush_hour ADD COLUMN screen_ncd_service_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'เวลารับบริการเฉลี่ย นาที/ราย' AFTER screen_ncd_avg_minutes",
             "ALTER TABLE rush_hour ADD COLUMN exam_ncd_service_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'เวลารับบริการเฉลี่ย นาที/ราย' AFTER exam_ncd_avg_minutes",
             "ALTER TABLE rush_hour ADD COLUMN lab_service_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'เวลารับบริการเฉลี่ย นาที/ราย' AFTER lab_avg_minutes",
+            "ALTER TABLE rush_hour ADD COLUMN avg_journey_minutes DECIMAL(6,1) DEFAULT NULL COMMENT 'รอเฉลี่ยสูตร C: จบ=000→999 / ยังไม่จบ=elapsed ถึงสิ้นชั่วโมง' AFTER avg_total_service_minutes",
         ];
         foreach ($alters as $sql) {
             try {
@@ -492,6 +493,7 @@ class RushHourAggregator
                     'capacity' => self::capacityFor($capacities, $zone),
                     'total_recipients' => (int) ($wide['total_recipients'] ?? 0),
                     'avg_total_service' => self::floatOrNull($wide['avg_total_service_minutes'] ?? null),
+                    'avg_journey' => self::floatOrNull($wide['avg_journey_minutes'] ?? null),
                 ];
             }
         }
