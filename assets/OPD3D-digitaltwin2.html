@@ -728,12 +728,14 @@ function seedLiveVisuals(hour = LIVE_HOUR) {
   const liveStationIds = new Set(Object.values(LIVE_ZONE));
   STATIONS.forEach(st => {
     const live = rowMap.get(st.id);
-    const count = live ? Math.max(0, Math.round(Number(live.waiting || 0))) : 0;
+    const waiting = live ? Math.max(0, Math.round(Number(live.waiting || 0))) : 0;
+    // อัตราส่วนฉาก 2:1 — รอ 2 ราย โชว์ person 1 คน (ป้ายยังแสดงยอดจริง)
+    const count = Math.floor(waiting / 2);
     // จุดใน rush_hour: ผู้รอเป็น 0 → ซ่อนผู้ให้บริการ
     if (liveStationIds.has(st.id)) {
-      (st.staffMeshes || []).forEach((mesh) => { mesh.visible = count > 0; });
+      (st.staffMeshes || []).forEach((mesh) => { mesh.visible = waiting > 0; });
     }
-    // แสดงแถวคงที่ตามจำนวนผู้รอเสมอ (ใช้คู่กับคนเดิน)
+    // แสดงแถวคงที่ตามจำนวน person (อัตราส่วน 2:1)
     if (count <= 0) return;
     for (let i = 0; i < count; i++) {
       const point = slotPos(st, i, LIVE_SP);
@@ -948,10 +950,15 @@ function fmtTipMinutes(v) {
 function stationTip(st) {
   const live = liveRows.get(st.id);
 
-  // LAB: ไม่คำนวณ/ไม่แสดงรอเฉลี่ย·รับบริการเฉลี่ยแบบจุดอื่น (จำนวนรออยู่ที่ป้ายแล้ว)
+  // LAB: รอเจาะเลือด (order→receive) + เวลาเฉลี่ย order→report — จำนวนรออยู่ที่ป้ายแล้ว
   if (st.id === 'lab') {
+    const labWait = live ? fmtTipMinutes(live.avg_wait) : '-';
+    const labOrderToReport = live ? fmtTipMinutes(live.avg_service) : '-';
     return `<div class="tt-h"><i style="background:${st.color}"></i><b>${st.name}</b></div>
-      <div class="tt-k" style="margin-bottom:0">จุดเจาะเลือด · ไม่แสดงรอ/รับบริการเฉลี่ยแบบห้องอื่น</div>`;
+      <div class="tt-g" style="margin-bottom:0;grid-template-columns:1fr 1fr">
+        <div><b>${labWait}</b><span>รอเจาะเลือดเฉลี่ย<br>(นาที/ราย)</span></div>
+        <div><b>${labOrderToReport}</b><span>สั่ง LAB → รายงานผล<br>(นาที/ราย)</span></div>
+      </div>`;
   }
 
   // ห้องอื่น: ใช้ค่าเฉลี่ยจาก rush_hour ของคาบที่กำลังดู (จำนวนรออยู่ที่ป้ายแล้ว)
