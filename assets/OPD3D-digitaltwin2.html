@@ -693,17 +693,18 @@ let simTime = 0, done = 0, losSum = 0, spawnAcc = 0, nextSpawn = 0, pid = 0;
 let simDayIndex = 0;
 let running = true, speed = 1.5, arrInterval = 4;
 const patients = [];
-/** เดินได้เมื่อ pharmacy_opd_waiting ของชั่วโมงที่กำลังแสดง > 0 */
-function pharmacyOpdWaitingForHour(hour = activeLiveHour) {
+/** รวมยอดรอทุกแผนกของชั่วโมงที่กำลังแสดง */
+function anyDeptWaitingForHour(hour = activeLiveHour) {
   const rows = liveHourly.get(Number(hour)) || liveHourly.get(String(hour)) || [];
-  const row = rows.find((r) => r.zone === 'pharmacy_opd');
-  if (row) return Math.max(0, Number(row.waiting || 0));
+  if (rows.length) {
+    return rows.reduce((sum, row) => sum + Math.max(0, Number(row.waiting || 0)), 0);
+  }
   // fallback จาก liveRows ปัจจุบัน
-  const live = liveRows.get('pharmOPD');
-  return live ? Math.max(0, Number(live.waiting || 0)) : 0;
+  return [...liveRows.values()].reduce((sum, row) => sum + Math.max(0, Number(row.waiting || 0)), 0);
 }
+/** เดินได้เมื่อมีแผนกใดก็ตามรออย่างน้อย 1 คน ในชั่วโมงที่กำลังแสดง */
 function isWalkSimActive() {
-  return pharmacyOpdWaitingForHour(activeLiveHour) > 0;
+  return anyDeptWaitingForHour(activeLiveHour) >= 1;
 }
 function clearWalkers() {
   for (const p of patients) {
