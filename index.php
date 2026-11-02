@@ -35,7 +35,8 @@ $today = date('Y-m-d');
 $visitStmt = $conn->prepare("INSERT INTO site_visits (visit_date, visit_count) VALUES (?, 1) ON DUPLICATE KEY UPDATE visit_count = visit_count + 1");
 $visitStmt->execute([$today]);
 try {
-    $externalLinks = $conn->query("SELECT * FROM externallink ORDER BY created_at LIMIT 5")->fetchAll();
+    // แสดงทุกลิงก์จาก admin (เดิม LIMIT 5 ทำให้ลิงก์ใหม่ไม่โผล่)
+    $externalLinks = $conn->query("SELECT * FROM externallink ORDER BY created_at DESC")->fetchAll();
 } catch(PDOException $e) {
     $externalLinks = [];
 }
