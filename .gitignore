@@ -9,4 +9,7 @@
 /.env
 /.env.local
 /.env.*.local
+# ไฟล์ secret จริง — ห้ามขึ้น git (.env.example อัปได้)
+/.env.myhospital
 .DS_Store
+
